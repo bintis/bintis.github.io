@@ -1,0 +1,100 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>Ryn · 星轨 Orbit</title>
+<link rel="stylesheet" href="../assets/common.css"></head><body>
+<div id="stage">
+  <div class="hud"><b>RYN</b> &nbsp;·&nbsp; Lyrics · Orbit</div>
+  <div class="track" style="right:40px;top:26px;text-align:right">
+    <div class="t">夜明けの航路 <span style="color:#6b7385;font-weight:400">(demo)</span></div>
+    <div class="a">soleil de minuit · Placeholder lyrics</div>
+    <div class="m" id="time"></div>
+  </div>
+</div>
+<script src="../assets/common.js"></script>
+<script>
+const CX = 640, CY = 362, BODY = 104, OX = 640, OY = 384, RX = 520, RY = 176, STEP = 30 * Math.PI / 180, TAU = Math.PI * 2;
+const PERI = {x: OX, y: OY + RY};
+const orbitPt = th => ({x: OX + RX * Math.sin(th), y: OY + RY * Math.cos(th), z: Math.cos(th)});
+function orbitPath(ctx, a0, a1, rx = RX, ry = RY, ox = OX, oy = OY, tilt = 0) {
+  ctx.beginPath();
+  for (let a = a0; a <= a1 + 1e-6; a += (a1 - a0) / 120) {
+    const x = rx * Math.sin(a), y = ry * Math.cos(a);
+    const X = ox + x * Math.cos(tilt) - y * Math.sin(tilt), Y = oy + x * Math.sin(tilt) + y * Math.cos(tilt);
+    a === a0 ? ctx.moveTo(X, Y) : ctx.lineTo(X, Y);
+  }
+}
+boot(({ctx, cover}, t, s) => {
+  bgFill(ctx, CX, CY, 800);
+  // decorative inclined orbits with small moons
+  const decos = [[600, 230, -0.26, .045, 0.18], [680, 270, 0.2, .035, -0.11]];
+  for (const [rx, ry, tilt, a, sp] of decos) {
+    ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = 1;
+    orbitPath(ctx, 0, TAU, rx, ry, CX, CY, tilt); ctx.stroke();
+    const m = t * sp, x = rx * Math.sin(m), y = ry * Math.cos(m);
+    ctx.fillStyle = 'rgba(163,170,184,.5)'; ctx.beginPath();
+    ctx.arc(CX + x * Math.cos(tilt) - y * Math.sin(tilt), CY + x * Math.sin(tilt) + y * Math.cos(tilt), 2, 0, TAU); ctx.fill();
+  }
+  // main orbit: back half (behind body)
+  ctx.strokeStyle = 'rgba(255,255,255,.07)'; orbitPath(ctx, Math.PI / 2, Math.PI * 1.5); ctx.stroke();
+
+  // lyric bodies
+  const items = [];
+  for (let i = 0; i < N; i++) { const d = rel(i, s.p), th = d * STEP; items.push({i, d, th, ...orbitPt(th)}); }
+  const drawItem = it => {
+    const f = focus(it.d), depth = (it.z + 1) / 2;
+    const alpha = f > 0 ? lerp(.7, 1, f) : clamp(depth * 1.25 - .25) * .8;
+    if (alpha < .02) return;
+    const fs = lerp(lerp(11, 17, depth), 36, f * f * (3 - 2 * f));
+    // planet dot on the orbit
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = f > .05 ? C.gold : C.sec;
+    ctx.beginPath(); ctx.arc(it.x, it.y, lerp(1.5, 3, depth) + f * 2, 0, TAU); ctx.fill();
+    // label hangs from the dot; at perihelion it drops below and enlarges
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.font = `${f > .6 ? 500 : 400} ${fs}px ${FONT_JA}`;
+    ctx.fillStyle = f > .05 ? (f > .6 ? C.text : C.sec) : (it.d > 0 ? C.sec : C.muted);
+    const ly = it.y + lerp(-12, 72, f);
+    ctx.fillText(LYRICS[it.i].ja, it.x, ly);
+    if (f > .02) {
+      ctx.globalAlpha = f * f; ctx.font = `400 17px ${FONT_ZH}`; ctx.fillStyle = C.gold;
+      ctx.fillText(LYRICS[it.i].zh, it.x, ly + 38);
+    }
+    ctx.globalAlpha = 1;
+  };
+  items.filter(it => it.z < 0).forEach(drawItem);
+
+  // central body: cover + waveform ring
+  const n = 120;
+  for (let k = 0; k < n; k++) {
+    const a = k / n * TAU - Math.PI / 2, v = fakeBand(t, (k < n / 2 ? k : n - k) / (n / 2));
+    const r0 = BODY + 12, r1 = r0 + 4 + v * 26;
+    ctx.strokeStyle = `rgba(184,149,90,${.18 + .4 * v})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(CX + Math.cos(a) * r0, CY + Math.sin(a) * r0); ctx.lineTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1); ctx.stroke();
+  }
+  const glow = ctx.createRadialGradient(CX, CY, BODY * .8, CX, CY, BODY + 70);
+  glow.addColorStop(0, 'rgba(184,149,90,.10)'); glow.addColorStop(1, 'rgba(184,149,90,0)');
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(CX, CY, BODY + 70, 0, TAU); ctx.fill();
+  drawCover(ctx, cover, CX, CY, BODY, 0);
+  ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(CX, CY, BODY + 1, 0, TAU); ctx.stroke();
+  // progress ring
+  ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.beginPath(); ctx.arc(CX, CY, BODY + 8, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = C.gold; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(CX, CY, BODY + 8, -Math.PI / 2, -Math.PI / 2 + TAU * s.progress); ctx.stroke();
+
+  // main orbit: front half, brightening toward perihelion
+  for (let k = 0; k < 60; k++) {
+    const a0 = -Math.PI / 2 + k / 60 * Math.PI, a1 = a0 + Math.PI / 60, c = Math.cos((a0 + a1) / 2);
+    ctx.strokeStyle = `rgba(184,149,90,${.06 + .3 * Math.pow(c, 6)})`; ctx.lineWidth = 1;
+    orbitPath(ctx, a0, a1); ctx.stroke();
+  }
+  // comet trail of the arriving line
+  const cur = items.find(it => it.i === s.idx);
+  if (cur && Math.abs(cur.th) > .001) {
+    const a0 = Math.min(cur.th, cur.th + .5 * Math.sign(cur.th)), a1 = Math.max(cur.th, cur.th + .5 * Math.sign(cur.th));
+    ctx.strokeStyle = rgba(C.goldHi, .5); ctx.lineWidth = 2; orbitPath(ctx, a0, a1); ctx.stroke();
+  }
+  // perihelion marker
+  ctx.strokeStyle = rgba(C.gold, .7); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PERI.x, PERI.y + 8); ctx.lineTo(PERI.x, PERI.y + 22); ctx.stroke();
+  ctx.font = `600 9px ${FONT_UI}`; ctx.fillStyle = C.muted; ctx.textAlign = 'left';
+  ctx.fillText('PERIHELION', PERI.x + 10, PERI.y + 4);
+  items.filter(it => it.z >= 0).sort((a, b) => a.z - b.z).forEach(drawItem);
+}, {trans: 1.1});
+</script></body></html>

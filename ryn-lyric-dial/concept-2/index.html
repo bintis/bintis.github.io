@@ -1,0 +1,111 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>Ryn · 星盘 Astrolabe</title>
+<link rel="stylesheet" href="../assets/common.css"></head><body>
+<div id="stage">
+  <div class="hud"><b>RYN</b> &nbsp;·&nbsp; Lyrics · Astrolabe</div>
+  <div class="track" style="right:40px;top:26px;text-align:right">
+    <div class="t">夜明けの航路 <span style="color:#6b7385;font-weight:400">(demo)</span></div>
+    <div class="a">soleil de minuit · Placeholder lyrics</div>
+    <div class="m" id="time"></div>
+  </div>
+</div>
+<script src="../assets/common.js"></script>
+<script>
+const CX = 640, CY = 770, RL = 478, STEP = 36 * Math.PI / 180, TAU = Math.PI * 2;
+const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+function ring(ctx, r, w = 1, a = .09) { ctx.lineWidth = w; ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.beginPath(); ctx.arc(CX, CY, r, 0, TAU); ctx.stroke(); }
+function ticks(ctx, r, n, len, rot, a, majorEvery = 0, majorLen = 0, gold = false) {
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const ang = rot + i / n * TAU, L = majorEvery && i % majorEvery === 0 ? majorLen : len;
+    const c = Math.cos(ang), s = Math.sin(ang);
+    ctx.moveTo(CX + c * r, CY + s * r); ctx.lineTo(CX + c * (r - L), CY + s * (r - L));
+  }
+  ctx.strokeStyle = gold ? `rgba(184,149,90,${a})` : `rgba(255,255,255,${a})`; ctx.lineWidth = 1; ctx.stroke();
+}
+boot(({ctx, cover}, t, s) => {
+  bgFill(ctx, CX, CY - 200, 1000);
+  // plate
+  const pg = ctx.createRadialGradient(CX, CY, 150, CX, CY, 640);
+  pg.addColorStop(0, '#182032'); pg.addColorStop(1, '#121927');
+  ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(CX, CY, 640, 0, TAU); ctx.fill();
+
+  // outer limb: degree scale, slow drift
+  const r0 = 625, rotA = -t * 0.012;
+  ring(ctx, 640, 1, .10); ring(ctx, r0, 1, .08);
+  ticks(ctx, r0, 360, 5, rotA, .14, 5, 10);
+  ctx.font = `500 10px ${FONT_UI}`; ctx.fillStyle = C.muted; ctx.textAlign = 'center';
+  for (let i = 0; i < 36; i++) {
+    const ang = rotA + i / 36 * TAU; ctx.save(); ctx.translate(CX + Math.cos(ang) * (r0 - 22), CY + Math.sin(ang) * (r0 - 22)); ctx.rotate(ang + Math.PI / 2);
+    ctx.fillText(String(i * 10).padStart(3, '0'), 0, 3); ctx.restore();
+  }
+  ring(ctx, 592, 1, .07);
+
+  // lyric band (the rete) — rotates with lyric position
+  const rete = -s.p * STEP;
+  ring(ctx, RL + 66, 1, .06); ring(ctx, RL - 70, 1, .06);
+  ticks(ctx, RL - 70, 120, 4, rete, .10, 10, 9);
+  // roman numerals for each line, riding with the rete
+  ctx.font = `500 11px ${FONT_UI}`;
+  for (let i = 0; i < N; i++) {
+    const d = rel(i, s.p), ang = -Math.PI / 2 + d * STEP;
+    if (Math.abs(d) > 2.8) continue;
+    const f = focus(d);
+    ctx.save(); ctx.translate(CX + Math.cos(ang) * (RL - 92), CY + Math.sin(ang) * (RL - 92)); ctx.rotate(ang + Math.PI / 2);
+    ctx.fillStyle = f > .02 ? rgba(C.gold, .5 + .5 * f) : rgba(C.muted, .8); ctx.fillText(ROMAN[i], 0, 4); ctx.restore();
+  }
+
+  // mid ring: fine scale, rotates the other way
+  const rotB = t * 0.05;
+  ring(ctx, 360, 1, .08); ticks(ctx, 360, 180, 4, rotB, .12, 15, 12);
+  ring(ctx, 330, 1, .05);
+  // inner dashed ring with gold marker, faster
+  const rotC = -t * 0.16;
+  ctx.setLineDash([2, 6]); ring(ctx, 300, 1, .12); ctx.setLineDash([]);
+  ctx.fillStyle = C.gold; ctx.beginPath(); ctx.arc(CX + Math.cos(rotC) * 300, CY + Math.sin(rotC) * 300, 2.5, 0, TAU); ctx.fill();
+  // song progress arc on ring 330
+  ctx.strokeStyle = rgba(C.gold, .8); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(CX, CY, 330, -Math.PI / 2, -Math.PI / 2 + TAU * s.progress); ctx.stroke();
+  // radial hairlines
+  ctx.strokeStyle = 'rgba(255,255,255,.035)'; ctx.lineWidth = 1; ctx.beginPath();
+  for (let i = 0; i < 12; i++) { const a = rotB * .5 + i / 12 * TAU; ctx.moveTo(CX + Math.cos(a) * 214, CY + Math.sin(a) * 214); ctx.lineTo(CX + Math.cos(a) * 296, CY + Math.sin(a) * 296); }
+  ctx.stroke();
+
+  // cover (mater)
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 40; ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.arc(CX, CY, 206, 0, TAU); ctx.fill(); ctx.restore();
+  drawCover(ctx, cover, CX, CY, 206, 0);
+  ring(ctx, 212, 1, .16); ring(ctx, 218, 1, .06);
+
+  // index mark at 12 o'clock
+  const top = CY - RL;
+  ctx.strokeStyle = rgba(C.gold, .9); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(CX, CY - 640); ctx.lineTo(CX, CY - 598); ctx.stroke();
+  ctx.fillStyle = C.gold; ctx.beginPath(); ctx.moveTo(CX - 6, CY - 594); ctx.lineTo(CX + 6, CY - 594); ctx.lineTo(CX, CY - 584); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(CX - 6, CY - 358); ctx.lineTo(CX + 6, CY - 358); ctx.lineTo(CX, CY - 368); ctx.closePath(); ctx.fill();
+
+  // engraved lyric lines on the rete
+  for (let i = 0; i < N; i++) {
+    const d = rel(i, s.p);
+    if (Math.abs(d) > 2.6) continue;
+    const f = focus(d), ang = -Math.PI / 2 + d * STEP;
+    const size = lerp(19, 32, f * f * (3 - 2 * f));
+    ctx.font = `${f > .6 ? 500 : 400} ${size}px ${FONT_JA}`;
+    const w = ctx.measureText(LYRICS[i].ja).width;
+    const anchor = -0.5 + 0.5 * clamp(d, -1, 1);      // centre at top, start/end away from it
+    const alpha = f > 0 ? lerp(.55, 1, f) : clamp(.55 - (Math.abs(d) - 1) * .6, 0, .55);
+    ctx.save(); ctx.translate(CX + Math.cos(ang) * RL, CY + Math.sin(ang) * RL); ctx.rotate(ang + Math.PI / 2);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.globalAlpha = alpha; ctx.fillStyle = f > .02 ? C.text : C.sec;
+    if (f > .5) { ctx.shadowColor = rgba(C.gold, .35 * f); ctx.shadowBlur = 18; }
+    ctx.fillText(LYRICS[i].ja, anchor * w, 0);
+    ctx.shadowBlur = 0;
+    if (f > .02) {
+      ctx.globalAlpha = f * f; ctx.font = `400 16px ${FONT_ZH}`; ctx.fillStyle = C.gold;
+      const w2 = ctx.measureText(LYRICS[i].zh).width;
+      ctx.fillText(LYRICS[i].zh, anchor * w2, 34);
+    }
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1; ctx.textAlign = 'left';
+});
+</script></body></html>

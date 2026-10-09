@@ -1,0 +1,218 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>Ryn · 光轮 II Luminous Train</title>
+<link rel="stylesheet" href="../assets/common.css">
+<style>
+.hud{letter-spacing:.34em;font-weight:300;font-size:11px;color:#6b7385}
+.hud b{font-weight:500;letter-spacing:.44em;color:#a3aab8}
+.track .t{font-weight:300;font-size:16px;letter-spacing:.08em}
+.track .a{font-weight:300;font-size:10.5px;letter-spacing:.26em;text-transform:uppercase;color:#6b7385;margin-top:9px}
+.track .m{font-weight:300;font-size:10.5px;letter-spacing:.22em;color:#6b7385;margin-top:6px}
+</style></head><body>
+<div id="stage">
+  <div class="hud" style="left:auto;right:48px"><b>RYN</b>&nbsp;&nbsp;·&nbsp;&nbsp;Lyrics</div>
+  <div class="track" style="right:48px;bottom:42px;text-align:right">
+    <div class="t">夜明けの航路</div>
+    <div class="a">soleil de minuit · demo</div>
+    <div class="m" id="time"></div>
+  </div>
+</div>
+<script src="../assets/common.js"></script>
+<script>
+/* Concept 7b — 光轮 II Luminous Train
+   One bold ring (40 outer teeth, 48 inner teeth) drives a plain visible chain inside the dial:
+   Ring(48 int) → L(28) → M(16) → S(10)   and   L(28) → S2(12).  No carrier, no bridges, no arms.
+   Wheels are luminous hairlines (with a dark under-stroke so they read on bright art);
+   the cover is veiled and turns crisp inside the wheels' spoke windows. Ring rotation = lyric arc. */
+const TAU = Math.PI * 2, CX = 200, CY = 400;
+const MI = 10, ZRI = 48, RRI = MI * ZRI / 2;          // ring internal: pitch R 240
+const MO = 16.25, ZRO = 40, RRO = MO * ZRO / 2;       // ring external crown: pitch R 325, tips 341 → Ø 682
+const R_COV = RRO - 1.25 * MO, R_TXT = 392;
+const STEP = 15 * Math.PI / 180;   // 1 line = 15°: 12 lines = 180° = 24 inner / 20 outer teeth → seamless loop
+const SS = 2, INK = '226,234,250';
+const smooth = x => x * x * x * (x * (x * 6 - 15) + 10);
+const easeInOutSine = x => -(Math.cos(Math.PI * x) - 1) / 2;
+
+// ── generic geometry
+function teeth(Z, R, m, internal) {   // bold, rounded tooth outline (points)
+  const rT = internal ? R - m : R + m, rR = internal ? R + 1.2 * m : R - 1.2 * m, pitch = TAU / Z, pts = [];
+  const hw = r => pitch * .5 * (.56 - .2 * clamp((r - rR) / (rT - rR)));
+  for (let k = 0; k < Z; k++) { const a = k * pitch;
+    pts.push([a - pitch / 2, rR]);
+    for (let i = 0; i <= 3; i++) { const r = lerp(rR, rT, i / 3); pts.push([a - hw(r) * R / r, r]); }
+    for (let i = 3; i >= 0; i--) { const r = lerp(rR, rT, i / 3); pts.push([a + hw(r) * R / r, r]); } }
+  return chaikin(pts.map(([a, r]) => [Math.cos(a) * r, Math.sin(a) * r]), 2);
+}
+function chaikin(pts, it) { for (let k = 0; k < it; k++) { const o = []; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; o.push([.75 * p[0] + .25 * q[0], .75 * p[1] + .25 * q[1]], [.25 * p[0] + .75 * q[0], .25 * p[1] + .75 * q[1]]); } pts = o; } return pts; }
+// window between two straight, gently tapered spokes (spoke half-width w0 at hub → w1 at rim)
+function windowShape(a0, a1, r0, r1, w0, w1) {
+  const P = [], half = r => lerp(w0, w1, (r - r0) / (r1 - r0)), L = r => a0 + half(r) / r, Rr = r => a1 - half(r) / r;
+  for (let i = 0; i <= 4; i++) { const r = lerp(r0, r1, i / 4); P.push([Math.cos(L(r)) * r, Math.sin(L(r)) * r]); }
+  for (let i = 1; i < 10; i++) { const a = lerp(L(r1), Rr(r1), i / 10); P.push([Math.cos(a) * r1, Math.sin(a) * r1]); }
+  for (let i = 4; i >= 0; i--) { const r = lerp(r0, r1, i / 4); P.push([Math.cos(Rr(r)) * r, Math.sin(Rr(r)) * r]); }
+  for (let i = 1; i < 6; i++) { const a = lerp(Rr(r0), L(r0), i / 6); P.push([Math.cos(a) * r0, Math.sin(a) * r0]); }
+  return chaikin(P, 4);
+}
+const toPath = (pts, p = new Path2D()) => { pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath(); return p; };
+const circ = (r, p = new Path2D(), x = 0, y = 0) => { p.moveTo(x + r, y); p.arc(x, y, r, 0, TAU); return p; };
+
+// ── the train (positions solved so every pair sits exactly at its centre distance)
+const G = {};
+{ const mk = (Z, n, hub) => ({Z, R: MI * Z / 2, n, hub});
+  G.L = mk(28, 5, 24); G.M = mk(16, 4, 16); G.S = mk(10, 3, 11); G.S2 = mk(12, 3, 13);
+  const at = (o, a, d) => ({x: o.x + Math.cos(a) * d, y: o.y + Math.sin(a) * d});
+  const O = {x: CX, y: CY};
+  Object.assign(G.L, at(O, -0.40, RRI - G.L.R));               // internal mesh with the ring
+  Object.assign(G.M, at(G.L, 2.70, G.L.R + G.M.R));
+  Object.assign(G.S, at(G.M, 0.90, G.M.R + G.S.R));
+  Object.assign(G.S2, at(G.L, 3.55, G.L.R + G.S2.R)); }
+function meshExt(a, b, thA) { const psi = Math.atan2(b.y - a.y, b.x - a.x); return psi + Math.PI - Math.PI / b.Z + (a.Z / b.Z) * (psi - thA); }
+function meshInt(thR, b) { const psi = Math.atan2(b.y - CY, b.x - CX); return psi - Math.PI / b.Z - (ZRI / b.Z) * (psi - thR); }
+
+// ── bake: line art = dark under-stroke (legibility on bright art) + glow + hairline, weight hierarchy
+function bakeWheel(def) {
+  const S = def.size, c = document.createElement('canvas'); c.width = c.height = Math.ceil(S * SS); c.size = S;
+  const g = c.getContext('2d'); g.scale(SS, SS); g.translate(S / 2, S / 2); g.lineJoin = 'round';
+  if (def.frost) { g.fillStyle = `rgba(${INK},${def.frost})`; g.fill(def.body, 'evenodd'); g.globalCompositeOperation = 'destination-out'; g.fillStyle = '#000'; for (const w of def.wins) g.fill(w); g.globalCompositeOperation = 'source-over'; }
+  const items = def.lines;   // [path, weight 0..1, dashed]
+  g.strokeStyle = 'rgba(6,9,16,.55)'; for (const [p, k, dash] of items) { if (dash) continue; g.lineWidth = 2.6 + k; g.stroke(p); }
+  for (const [p, k, dash] of items) { if (dash) continue; g.strokeStyle = `rgba(${INK},${.07 * k})`; g.lineWidth = 4; g.stroke(p); }
+  for (const [p, k, dash] of items) { g.setLineDash(dash ? [2, 5] : []); g.strokeStyle = `rgba(${INK},${k})`; g.lineWidth = dash ? .8 : .7 + .5 * k; g.stroke(p); }
+  g.setLineDash([]); return c;
+}
+function wheelDef(w) {
+  const m = MI, rRoot = w.R - 1.2 * m, rim = Math.max(7, w.R * .1), out = toPath(teeth(w.Z, w.R, m, false));
+  const sw = w.R * .07, wins = [];
+  for (let k = 0; k < w.n; k++) wins.push(toPath(windowShape(k * TAU / w.n, (k + 1) * TAU / w.n, w.hub + 5, rRoot - rim, sw * .9, sw * .6)));
+  const body = new Path2D(); body.addPath(out);
+  return {size: 2 * (w.R + m) + 16, wins, body, frost: .07,
+    lines: [[out, .85], ...wins.map(p => [p, .4]), [circ(w.hub), .5], [circ(w.hub * .42), .35], [circ(w.R), .2, true]]};
+}
+const B = {};
+function bake(cover) {
+  const S = 2 * R_COV;
+  const mk = () => { const c = document.createElement('canvas'); c.width = c.height = S * SS; const g = c.getContext('2d'); g.scale(SS, SS); return [c, g]; };
+  { const [c, g] = mk(); g.beginPath(); g.arc(R_COV, R_COV, R_COV, 0, TAU); g.clip();
+    g.filter = 'blur(1.6px) saturate(.8) brightness(.67)'; if (cover) g.drawImage(cover, -4, -4, S + 8, S + 8); g.filter = 'none';
+    g.globalCompositeOperation = 'multiply'; g.fillStyle = 'rgb(182,195,228)'; g.fillRect(0, 0, S, S); g.globalCompositeOperation = 'source-over';
+    // ring band under heavier frost so the rim reads as one bold part
+    g.fillStyle = 'rgba(14,19,31,.3)'; g.beginPath(); g.arc(R_COV, R_COV, R_COV, 0, TAU); g.arc(R_COV, R_COV, RRI + 1.2 * MI, 0, TAU, true); g.fill();
+    B.veil = c; }
+  { const [c, g] = mk(); g.filter = 'saturate(1.03) contrast(1.03)'; if (cover) g.drawImage(cover, 0, 0, S, S); B.crisp = c; }
+  for (const k of ['L', 'M', 'S', 'S2']) { G[k].def = wheelDef(G[k]); B[k] = bakeWheel(G[k].def); }
+  { const outer = toPath(teeth(ZRO, RRO, MO, false)), inner = toPath(teeth(ZRI, RRI, MI, true)), body = new Path2D();
+    body.addPath(outer); body.addPath(inner);
+    const scale = new Path2D(); const rS = (RRI + 1.2 * MI + RRO - 1.2 * MO) / 2;
+    for (let k = 0; k < 24; k++) { const a = k * STEP, l = k % 2 ? 4 : 8; scale.moveTo(Math.cos(a) * (rS - l), Math.sin(a) * (rS - l)); scale.lineTo(Math.cos(a) * (rS + l), Math.sin(a) * (rS + l)); }
+    B.ring = bakeWheel({size: 2 * (RRO + MO) + 16, body, frost: .05, wins: [],
+      lines: [[outer, .8], [inner, .6], [scale, .3], [circ(RRO - 1.2 * MO - 6), .16], [circ(RRI + 1.2 * MI + 6), .16]]}); }
+  const shadow = c => { const t = document.createElement('canvas'); t.width = t.height = c.width; const g = t.getContext('2d'); g.filter = `blur(${3 * SS}px) brightness(0)`; g.drawImage(c, 0, 0); t.size = c.size; return t; };
+  for (const k of ['ring', 'L', 'M', 'S', 'S2']) B[k + 'Sh'] = shadow(B[k]);
+  B.mask = document.createElement('canvas');
+}
+function put(ctx, c, x, y, a, alpha = 1) { ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); ctx.rotate(a); ctx.drawImage(c, -c.size / 2, -c.size / 2, c.size, c.size); ctx.restore(); }
+
+const DUST = Array.from({length: 46}, (_, i) => { const h = n => ((Math.sin(i * 127.1 + n * 311.7) * 43758.5453) % 1 + 1) % 1; return {x: h(1), y: h(2), r: .5 + h(3) * 1.1, s: .2 + h(4) * .8, p: h(5) * TAU}; });
+const BOKEH = [[560, 120, 30], [470, 690, 44], [690, 760, 26], [1100, 200, 40]];
+
+boot(({ctx, cover}, t, s) => {
+  if (!B.veil) bake(cover);
+  const dpr = ctx.getTransform().a;
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, 1280, 800);
+  const pool = ctx.createRadialGradient(CX + 60, CY - 20, 60, CX, CY, 800); pool.addColorStop(0, 'rgba(40,52,78,.4)'); pool.addColorStop(1, 'rgba(17,23,37,0)');
+  ctx.fillStyle = pool; ctx.fillRect(0, 0, 1280, 800);
+
+  // kinematics
+  const thR = -s.p * STEP;
+  const th = {}; th.L = meshInt(thR, G.L); th.M = meshExt(G.L, G.M, th.L); th.S = meshExt(G.M, G.S, th.M); th.S2 = meshExt(G.L, G.S2, th.L);
+  const px = Math.sin(t * .13) * 2, py = Math.cos(t * .11) * 1.5;
+  const beat = Math.exp(-mod(t, .5) / .12) * (mod(Math.floor(t / .5), 4) === 0 ? 1 : .55);
+  const dep = {ring: .4, L: 1, M: 1.25, S: 1.5, S2: 1.5};   // parallax depth: smaller wheels sit nearer the glass
+
+  for (const [bx, by, br] of BOKEH) { const g = ctx.createRadialGradient(bx - px * 2, by - py * 2, 0, bx - px * 2, by - py * 2, br); g.addColorStop(0, 'rgba(170,190,230,.05)'); g.addColorStop(1, 'rgba(170,190,230,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx - px * 2, by - py * 2, br, 0, TAU); ctx.fill(); }
+
+  // cover under the veil + crisp windows
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 60; ctx.fillStyle = '#0d121c'; ctx.beginPath(); ctx.arc(CX, CY, R_COV, 0, TAU); ctx.fill(); ctx.restore();
+  ctx.drawImage(B.veil, CX - R_COV, CY - R_COV, 2 * R_COV, 2 * R_COV);
+  { const S = 2 * R_COV, mc = B.mask; if (mc.width !== Math.round(S * dpr)) mc.width = mc.height = Math.round(S * dpr);
+    const g = mc.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, mc.width, mc.height); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.fillStyle = '#fff'; g.shadowColor = '#fff'; g.shadowBlur = 6 * dpr;
+    for (const k of ['L', 'M', 'S', 'S2']) { const w = G[k]; g.save(); g.translate(w.x - CX + R_COV + px * dep[k], w.y - CY + R_COV + py * dep[k]); g.rotate(th[k]); for (const p of w.def.wins) g.fill(p); g.restore(); }
+    g.shadowBlur = 0; g.globalCompositeOperation = 'source-in'; g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(B.crisp, 0, 0, mc.width, mc.height); g.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = .93 + .07 * beat; ctx.drawImage(mc, CX - R_COV, CY - R_COV, S, S); ctx.globalAlpha = 1; }
+  { ctx.save(); ctx.beginPath(); ctx.arc(CX, CY, R_COV, 0, TAU); ctx.clip(); ctx.globalCompositeOperation = 'screen';
+    const u = mod(t / 11, 1), x0 = CX - 560 + u * 1120, sw = ctx.createLinearGradient(x0 - 150, CY - 320, x0 + 150, CY + 320);
+    sw.addColorStop(0, 'rgba(200,214,240,0)'); sw.addColorStop(.5, 'rgba(200,214,240,.06)'); sw.addColorStop(1, 'rgba(200,214,240,0)');
+    ctx.fillStyle = sw; ctx.fillRect(CX - R_COV, CY - R_COV, 2 * R_COV, 2 * R_COV); ctx.restore(); }
+
+  // shadows, then the wheels
+  const O = [5, 8];
+  put(ctx, B.ringSh, CX + O[0] * .5, CY + O[1] * .5, thR, .45);
+  for (const k of ['L', 'M', 'S', 'S2']) put(ctx, B[k + 'Sh'], G[k].x + O[0] * dep[k], G[k].y + O[1] * dep[k], th[k], .45);
+  put(ctx, B.ring, CX + px * dep.ring, CY + py * dep.ring, thR);
+  for (const k of ['L', 'M', 'S', 'S2']) put(ctx, B[k], G[k].x + px * dep[k], G[k].y + py * dep[k], th[k]);
+
+  // beat light along pitch circles (additive)
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+  const comet = (x, y, r, a, len, al) => { for (let k = 0; k < 6; k++) { ctx.strokeStyle = `rgba(${INK},${al * (1 - k / 6)})`; ctx.lineWidth = 1.5 - k * .15; ctx.beginPath(); ctx.arc(x, y, r, a - (k + 1) * len / 6, a - k * len / 6); ctx.stroke(); } };
+  comet(CX, CY, RRI, -t * .3 + 1, .5, .2 + .4 * beat);
+  comet(G.L.x + px, G.L.y + py, G.L.R, t * .8, 1.0, .22 + .5 * beat);
+  comet(G.M.x + px * 1.25, G.M.y + py * 1.25, G.M.R, -t * 1.1 + 2, 1.1, .16 + .4 * beat);
+  // mesh points: where two wheels touch, a soft light breathes with the beat — the linkage reads at a glance
+  const meshPt = (a, b, sign) => { const d = Math.hypot(b.x - a.x, b.y - a.y), k = sign * a.R / d, x = a.x + (b.x - a.x) * k, y = a.y + (b.y - a.y) * k;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, 16); g.addColorStop(0, `rgba(${INK},${.22 + .4 * beat})`); g.addColorStop(1, `rgba(${INK},0)`); ctx.fillStyle = g; ctx.fillRect(x - 16, y - 16, 32, 32); };
+  meshPt({x: CX, y: CY, R: RRI}, G.L, 1); meshPt(G.L, G.M, 1); meshPt(G.M, G.S, 1); meshPt(G.L, G.S2, 1);
+  ctx.restore();
+
+  // glass crescent highlight + rim
+  { ctx.save(); ctx.beginPath(); ctx.arc(CX, CY, R_COV - 1, 0, TAU); ctx.clip();
+    const hl = ctx.createLinearGradient(CX - 200, CY - 300, CX + 80, CY - 40); hl.addColorStop(0, 'rgba(225,235,255,.09)'); hl.addColorStop(1, 'rgba(225,235,255,0)');
+    ctx.fillStyle = hl; ctx.beginPath(); ctx.arc(CX, CY, R_COV - 6, Math.PI * 1.1, Math.PI * 1.7); ctx.arc(CX + 50, CY + 44, R_COV - 6, Math.PI * 1.7, Math.PI * 1.1, true); ctx.fill(); ctx.restore(); }
+  // progress: gold hairline just outside the teeth
+  const RP = RRO + MO + 9;
+  ctx.lineWidth = .7; ctx.strokeStyle = `rgba(${INK},.07)`; ctx.beginPath(); ctx.arc(CX, CY, RP, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = rgba(C.gold, .7); ctx.beginPath(); ctx.arc(CX, CY, RP, -Math.PI / 2, -Math.PI / 2 + TAU * s.progress); ctx.stroke();
+  // index + connector
+  { const ix = CX + RP, g = ctx.createRadialGradient(ix, CY, 0, ix, CY, 22);
+    g.addColorStop(0, rgba(C.goldHi, .3 + .25 * beat)); g.addColorStop(1, rgba(C.goldHi, 0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ix, CY, 22, 0, TAU); ctx.fill();
+    ctx.fillStyle = C.goldHi; ctx.beginPath(); ctx.arc(ix, CY, 2.2, 0, TAU); ctx.fill();
+    const lg = ctx.createLinearGradient(ix + 8, 0, CX + R_TXT - 16, 0); lg.addColorStop(0, rgba(C.gold, .8)); lg.addColorStop(1, rgba(C.gold, 0));
+    ctx.strokeStyle = lg; ctx.lineWidth = .8; ctx.beginPath(); ctx.moveTo(ix + 8, CY); ctx.lineTo(CX + R_TXT - 16, CY); ctx.stroke(); }
+  for (const d of DUST) { const x = 20 + mod(d.x * 620 + t * 4 * d.s, 620), y = 60 + mod(d.y * 680 - t * 6 * d.s, 680);
+    const tw = .5 + .5 * Math.sin(t * (.6 + d.s) + d.p); ctx.fillStyle = `rgba(${INK},${.05 + .15 * tw})`; ctx.beginPath(); ctx.arc(x, y, d.r, 0, TAU); ctx.fill(); }
+
+  // lyric arc
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  for (let i = 0; i < N; i++) {
+    const d = rel(i, s.p); if (Math.abs(d) > 3.2) continue;
+    const f = focus(d), e = smooth(f), a = d * STEP, ad = Math.abs(d);
+    const alpha = f > 0 ? lerp(.5, 1, e) : clamp(.52 - (ad - 1) * .2);
+    if (alpha <= .01) continue;
+    const size = lerp(18 - Math.max(0, ad - 1) * 1.2, 34, e);
+    ctx.save(); ctx.translate(CX + Math.cos(a) * R_TXT, CY + Math.sin(a) * R_TXT); ctx.rotate(a);
+    if (ad > 1.4) ctx.filter = `blur(${((ad - 1.4) * .7).toFixed(2)}px)`;
+    ctx.font = `${e > .5 ? 400 : 300} ${size}px ${FONT_JA}`; ctx.letterSpacing = `${lerp(1.5, 3, e)}px`;
+    ctx.globalAlpha = alpha; ctx.fillStyle = d > 0 ? C.sec : C.muted;
+    if (f > .02) ctx.fillStyle = `rgba(163,170,184,${lerp(1, .42, e)})`;
+    ctx.fillText(LYRICS[i].ja, 0, 0);
+    ctx.filter = 'none';
+    if (f > .02) {
+      // karaoke reveal: gold → white gradient sweeps through the line with a soft glow
+      const w = ctx.measureText(LYRICS[i].ja).width, isCur = i === s.idx;
+      const prog = isCur ? clamp((s.local - .35) / (LINE_DUR - .7)) : 1;
+      const edge = w * easeInOutSine(prog);
+      const gr = ctx.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, C.goldHi); gr.addColorStop(.55, '#e9dcc0'); gr.addColorStop(1, '#f3efe6');
+      ctx.save(); ctx.beginPath(); ctx.rect(-4, -40, edge + 4, 80); ctx.clip();
+      ctx.globalAlpha = e; ctx.shadowColor = rgba(C.gold, .45); ctx.shadowBlur = 16; ctx.fillStyle = gr; ctx.fillText(LYRICS[i].ja, 0, 0);
+      ctx.restore();
+      if (isCur && prog > 0 && prog < 1) { const hg = ctx.createRadialGradient(edge, 0, 0, edge, 0, 26); hg.addColorStop(0, rgba(C.goldHi, .22 * e)); hg.addColorStop(1, rgba(C.goldHi, 0)); ctx.fillStyle = hg; ctx.globalAlpha = 1; ctx.fillRect(edge - 26, -26, 52, 52); }
+      ctx.globalAlpha = e * e; ctx.letterSpacing = '4px'; ctx.font = `300 14px ${FONT_ZH}`; ctx.fillStyle = C.sec; ctx.fillText(LYRICS[i].zh, 2, 44);
+    }
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1; ctx.letterSpacing = '0px'; ctx.filter = 'none';
+
+  // vignette
+  const vg = ctx.createRadialGradient(560, 400, 300, 640, 400, 940); vg.addColorStop(0, 'rgba(8,11,18,0)'); vg.addColorStop(1, 'rgba(8,11,18,.55)');
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, 1280, 800);
+}, {trans: 1.8, ease: easeInOutSine});
+</script></body></html>

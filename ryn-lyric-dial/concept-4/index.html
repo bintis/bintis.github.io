@@ -1,0 +1,115 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>Ryn · 滚筒 Drum</title>
+<link rel="stylesheet" href="../assets/common.css"></head><body>
+<div id="stage">
+  <div class="hud"><b>RYN</b> &nbsp;·&nbsp; Lyrics · Music-box Drum</div>
+</div>
+<script src="../assets/common.js"></script>
+<script>
+const DX0 = 420, DX1 = 1220, DCX = (DX0 + DX1) / 2, CY = 410, R = 300, STEP = 21 * Math.PI / 180, F = 2600, TAU = Math.PI * 2;
+// fixed pseudo-random pin layout per line
+const sxOf = ph => F / (F + R * (1 - Math.cos(ph)));
+function barrel(ctx) {
+  ctx.beginPath(); const H = (DX1 - DX0) / 2;
+  for (let a = -Math.PI / 2; a <= Math.PI / 2 + 1e-6; a += Math.PI / 60) ctx.lineTo(DCX + H * sxOf(a), CY + R * Math.sin(a));
+  for (let a = Math.PI / 2; a >= -Math.PI / 2 - 1e-6; a -= Math.PI / 60) ctx.lineTo(DCX - H * sxOf(a), CY + R * Math.sin(a));
+  ctx.closePath();
+}
+const PINS = LYRICS.map((_, i) => Array.from({length: 7}, (_, k) => ((Math.sin(i * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1));
+boot(({ctx, cover}, t, s) => {
+  bgFill(ctx, 800, 400, 900);
+  // ---- cover plate (left)
+  const PX = 64, PY = 214, PW = 300, PH = 392;
+  const pg = ctx.createLinearGradient(PX, PY, PX + PW, PY + PH);
+  pg.addColorStop(0, '#1b2333'); pg.addColorStop(1, '#151c2a');
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 10;
+  ctx.fillStyle = pg; ctx.beginPath(); ctx.roundRect(PX, PY, PW, PH, 6); ctx.fill(); ctx.restore();
+  ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(PX + .5, PY + .5, PW - 1, PH - 1, 6); ctx.stroke();
+  for (const [x, y] of [[PX + 14, PY + 14], [PX + PW - 14, PY + 14], [PX + 14, PY + PH - 14], [PX + PW - 14, PY + PH - 14]]) {
+    ctx.fillStyle = '#2a3243'; ctx.beginPath(); ctx.arc(x, y, 4, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.15)'; ctx.beginPath(); ctx.moveTo(x - 2.5, y - 2.5); ctx.lineTo(x + 2.5, y + 2.5); ctx.stroke();
+  }
+  if (cover) ctx.drawImage(cover, PX + 40, PY + 40, 220, 220);
+  ctx.strokeStyle = 'rgba(184,149,90,.5)'; ctx.strokeRect(PX + 36.5, PY + 36.5, 227, 227);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.font = `500 17px ${FONT_JA}`; ctx.fillStyle = C.text; ctx.fillText('夜明けの航路', PX + 40, PY + 298);
+  ctx.font = `400 12px ${FONT_UI}`; ctx.fillStyle = C.sec; ctx.fillText('soleil de minuit · demo', PX + 40, PY + 320);
+  // progress
+  ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(PX + 40, PY + 346, 220, 2);
+  ctx.fillStyle = C.gold; ctx.fillRect(PX + 40, PY + 346, 220 * s.progress, 2);
+  ctx.font = `500 10px ${FONT_UI}`; ctx.fillStyle = C.muted; ctx.fillText(fmtTime(s.song), PX + 40, PY + 366);
+  ctx.textAlign = 'right'; ctx.fillText(fmtTime(SONG_DUR), PX + 260, PY + 366);
+
+  // ---- drum body
+  const rot = s.p * STEP;
+  const body = ctx.createLinearGradient(0, CY - R, 0, CY + R);
+  body.addColorStop(0, '#0c1019'); body.addColorStop(.32, '#161e2e'); body.addColorStop(.5, '#1c2538'); body.addColorStop(.68, '#161e2e'); body.addColorStop(1, '#0c1019');
+  ctx.fillStyle = body; barrel(ctx); ctx.fill();
+  // ribs that roll with the drum
+  for (let k = -40; k <= 40; k++) {
+    const ph = k * STEP / 3 - mod(rot, STEP / 3); if (Math.abs(ph) > Math.PI / 2) continue;
+    const y = CY + R * Math.sin(ph), c = Math.cos(ph), sx = F / (F + R * (1 - c));
+    const half = (DX1 - DX0) / 2 * sx;
+    ctx.strokeStyle = `rgba(255,255,255,${.035 * c})`; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(DCX - half + 30, y); ctx.lineTo(DCX + half - 30, y); ctx.stroke();
+  }
+  // end caps (bevel) + axle hubs
+  for (const side of [-1, 1]) {
+    const x = side < 0 ? DX0 : DX1;
+    const cg = ctx.createLinearGradient(0, CY - R, 0, CY + R);
+    cg.addColorStop(0, 'rgba(255,255,255,0)'); cg.addColorStop(.5, 'rgba(200,210,230,.18)'); cg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.strokeStyle = cg; ctx.lineWidth = 10; ctx.beginPath();
+    for (let a = -Math.PI / 2; a <= Math.PI / 2 + 1e-6; a += Math.PI / 60) { const xx = DCX + side * ((DX1 - DX0) / 2 * sxOf(a) - 6); const yy = CY + R * Math.sin(a); a === -Math.PI / 2 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy); }
+    ctx.stroke(); ctx.lineWidth = 1;
+    ctx.fillStyle = '#0d121c'; ctx.beginPath(); ctx.arc(x + side * 18, CY, 13, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.stroke();
+    ctx.fillStyle = C.gold; ctx.beginPath(); ctx.arc(x + side * 18, CY, 3, 0, TAU); ctx.fill();
+  }
+  // front reading window
+  const wg = ctx.createLinearGradient(0, CY - 62, 0, CY + 62);
+  wg.addColorStop(0, 'rgba(184,149,90,0)'); wg.addColorStop(.5, 'rgba(184,149,90,.07)'); wg.addColorStop(1, 'rgba(184,149,90,0)');
+  ctx.fillStyle = wg; ctx.fillRect(DX0 + 14, CY - 62, DX1 - DX0 - 28, 124);
+  ctx.strokeStyle = 'rgba(184,149,90,.25)'; ctx.lineWidth = 1;
+  for (const y of [CY - 58, CY + 58]) { ctx.beginPath(); ctx.moveTo(DX0 + 14, y); ctx.lineTo(DX1 - 14, y); ctx.stroke(); }
+  // index pointers
+  ctx.fillStyle = C.gold;
+  ctx.beginPath(); ctx.moveTo(DX0 - 2, CY - 7); ctx.lineTo(DX0 + 10, CY); ctx.lineTo(DX0 - 2, CY + 7); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(DX1 + 2, CY - 7); ctx.lineTo(DX1 - 10, CY); ctx.lineTo(DX1 + 2, CY + 7); ctx.fill();
+
+  // ---- printed lines
+  ctx.save(); barrel(ctx); ctx.clip();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const printAt = (ph, str, font, color, alpha) => {
+    if (Math.abs(ph) > 1.45) return;
+    const c = Math.cos(ph), y = CY + R * Math.sin(ph), sx = F / (F + R * (1 - c));
+    ctx.save(); ctx.translate(DCX, y); ctx.scale(sx, c); ctx.globalAlpha = alpha * Math.pow(c, 1.5);
+    ctx.font = font; ctx.fillStyle = color; ctx.fillText(str, 0, 0); ctx.restore();
+  };
+  for (let i = 0; i < N; i++) {
+    const d = rel(i, s.p), ph = d * STEP, f = focus(d);
+    if (Math.abs(ph) > 1.5) continue;
+    const size = lerp(24, 36, f);
+    printAt(ph - (f > .02 ? .045 * f : 0), LYRICS[i].ja, `${f > .5 ? 500 : 400} ${size}px ${FONT_JA}`, f > .5 ? C.text : (d > 0 ? C.sec : C.muted), lerp(.75, 1, f));
+    if (f > .02) printAt(ph + .085, LYRICS[i].zh, `400 16px ${FONT_ZH}`, C.gold, f * f);
+    // music-box pins along the row
+    const c = Math.cos(ph), y = CY + R * Math.sin(ph) - (f > .02 ? 0 : 0), sx = F / (F + R * (1 - c));
+    for (const u of PINS[i]) {
+      const x = DCX + (u < .5 ? -1 : 1) * (330 + 40 * ((u * 7) % 1)) * sx;
+      ctx.fillStyle = f > .3 ? rgba(C.gold, .9 * c) : `rgba(200,206,220,${.35 * c})`;
+      ctx.beginPath(); ctx.ellipse(x, y, 2.2 * sx, 2.2 * c, 0, 0, TAU); ctx.fill();
+    }
+  }
+  ctx.restore();
+  // shading over the curvature
+  const sh = ctx.createLinearGradient(0, CY - R, 0, CY + R);
+  sh.addColorStop(0, 'rgba(10,13,21,.95)'); sh.addColorStop(.22, 'rgba(10,13,21,.0)'); sh.addColorStop(.78, 'rgba(10,13,21,.0)'); sh.addColorStop(1, 'rgba(10,13,21,.95)');
+  ctx.fillStyle = sh; barrel(ctx); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.09)'; barrel(ctx); ctx.stroke();
+  // comb teeth under the drum (music box)
+  for (let k = 0; k < 22; k++) {
+    const x = DX0 + 60 + k * ((DX1 - DX0 - 120) / 21), L = 34 - k * .7, lv = fakeBand(t, k / 22);
+    ctx.fillStyle = `rgba(184,149,90,${.18 + .5 * lv * lv})`;
+    ctx.fillRect(x - 2, CY + R + 22, 4, L);
+  }
+  ctx.fillStyle = '#1e2636'; ctx.fillRect(DX0 + 40, CY + R + 54, DX1 - DX0 - 80, 6);
+}, {trans: 1.0});
+</script></body></html>

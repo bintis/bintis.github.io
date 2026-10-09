@@ -1,0 +1,128 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>Ryn · 唱片沟槽 Vinyl Groove</title>
+<link rel="stylesheet" href="../assets/common.css"></head><body>
+<div id="stage">
+  <div class="hud" style="left:auto;right:40px;text-align:right"><b>RYN</b> &nbsp;·&nbsp; Lyrics · Vinyl Groove</div>
+  <div class="track" style="right:40px;bottom:64px;text-align:right">
+    <div class="t">夜明けの航路 <span style="color:#6b7385;font-weight:400">(demo)</span></div>
+    <div class="a">soleil de minuit · Placeholder lyrics</div>
+    <div class="m" id="time"></div>
+  </div>
+  <div class="foot" style="left:auto;right:40px">33⅓ RPM · <span>Side A</span></div>
+</div>
+<script src="../assets/common.js"></script>
+<script>
+const CX = 230, CY = 650, R = 640, RC = 430, GAP = 60, LABEL = 128;
+const A = -60 * Math.PI / 180;       // needle angle (where every line starts)
+const PIV = {x: 64, y: 40};
+boot(({ctx, cover}, t, s) => {
+  bgFill(ctx, 900, 300, 1100);
+  const rot = t * 0.35;               // slow visual spin
+
+  // record body
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 60;
+  ctx.beginPath(); ctx.arc(CX, CY, R, 0, Math.PI * 2);
+  const g = ctx.createRadialGradient(CX, CY, LABEL, CX, CY, R);
+  g.addColorStop(0, '#0b0f18'); g.addColorStop(.97, '#0e131e'); g.addColorStop(1, '#161d2b');
+  ctx.fillStyle = g; ctx.fill(); ctx.restore();
+  // fine grooves
+  ctx.lineWidth = 1;
+  for (let r = LABEL + 18; r < R - 6; r += 3.2) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.018 + 0.012 * Math.sin(r * .37)})`;
+    ctx.beginPath(); ctx.arc(CX, CY, r, 0, Math.PI * 2); ctx.stroke();
+  }
+  // rotating sheen (two opposite soft wedges)
+  for (const off of [0, Math.PI]) {
+    ctx.save(); ctx.beginPath(); ctx.moveTo(CX, CY);
+    ctx.arc(CX, CY, R - 4, rot + off - .22, rot + off + .22); ctx.closePath(); ctx.clip();
+    const sg = ctx.createRadialGradient(CX, CY, LABEL, CX, CY, R);
+    sg.addColorStop(0, 'rgba(255,255,255,0)'); sg.addColorStop(.6, 'rgba(200,210,235,.045)'); sg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sg; ctx.fillRect(CX - R, CY - R, R * 2, R * 2); ctx.restore();
+  }
+  // rim
+  ctx.strokeStyle = 'rgba(255,255,255,.10)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(CX, CY, R - 1, 0, Math.PI * 2); ctx.stroke();
+
+  // label = cover
+  drawCover(ctx, cover, CX, CY, LABEL, rot);
+  ctx.strokeStyle = 'rgba(184,149,90,.55)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(CX, CY, LABEL + 6, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = C.bg; ctx.beginPath(); ctx.arc(CX, CY, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.stroke();
+
+  // lyric lines in grooves
+  ctx.textBaseline = 'alphabetic';
+  const items = [];
+  for (let i = 0; i < N; i++) {
+    const d = rel(i, s.p);
+    if (d < -4.6 || d > 3.6) continue;
+    items.push({i, d, r: RC + d * GAP - 26 * clamp(-d)});
+  }
+  for (const it of items) {
+    const f = focus(it.d);
+    const size = lerp(19, 28, f);
+    const fade = clamp(1 - (Math.abs(it.d) - 2.4) / 1.4) ; // fade far lines
+    const r = it.r;
+    // the groove the line sits in
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = f > 0.01 ? `rgba(184,149,90,${0.35 * f})` : `rgba(255,255,255,${0.05 * fade})`;
+    ctx.beginPath(); ctx.arc(CX, CY, r - 8, A - .02, A + 1.25); ctx.stroke();
+    ctx.font = `${f > .5 ? 500 : 400} ${size}px ${FONT_JA}`;
+    const base = it.d > 0 ? C.sec : C.muted;
+    ctx.fillStyle = f > 0.01 ? mixColor(base, C.goldHi, f) : base;
+    ctx.globalAlpha = clamp(fade * (it.d < 0 ? .55 : .8) + f * .5);
+    arcText(ctx, LYRICS[it.i].ja, CX, CY, r, A + 0.035, 'start', f * 1.5);
+    // translation: rides just inside the current groove
+    if (f > 0.02) {
+      ctx.globalAlpha = f * f;
+      ctx.font = `400 15px ${FONT_ZH}`; ctx.fillStyle = C.sec;
+      arcText(ctx, LYRICS[it.i].zh, CX, CY, r - 30, A + 0.04, 'start', 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // tonearm (pivot top-left, tip at the current groove start)
+  const wob = Math.sin(t * 2.1) * 0.0025;
+  const tip = {x: CX + (RC + 13) * Math.cos(A - .008), y: CY + (RC + 13) * Math.sin(A - .008)};
+  const ang = Math.atan2(tip.y - PIV.y, tip.x - PIV.x) + wob, len = Math.hypot(tip.x - PIV.x, tip.y - PIV.y);
+  ctx.save(); ctx.translate(PIV.x, PIV.y); ctx.rotate(ang);
+  ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
+  const ag = ctx.createLinearGradient(0, -3, 0, 3); ag.addColorStop(0, '#c9ced8'); ag.addColorStop(1, '#6b7385');
+  ctx.fillStyle = ag; ctx.fillRect(0, -2.5, len - 34, 5);
+  // headshell
+  ctx.fillStyle = '#2a3242'; ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(len - 40, -9, 40, 18, 3); ctx.fill(); ctx.stroke();
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = C.gold; ctx.beginPath(); ctx.arc(len - 2, 0, 3.2, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // pivot
+  ctx.fillStyle = '#1b2232'; ctx.strokeStyle = 'rgba(255,255,255,.18)';
+  ctx.beginPath(); ctx.arc(PIV.x, PIV.y, 30, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#a3aab8'; ctx.beginPath(); ctx.arc(PIV.x, PIV.y, 9, 0, Math.PI * 2); ctx.fill();
+  // needle glow on groove
+  const gl = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, 26);
+  gl.addColorStop(0, 'rgba(212,180,122,.35)'); gl.addColorStop(1, 'rgba(212,180,122,0)');
+  ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(tip.x, tip.y, 26, 0, Math.PI * 2); ctx.fill();
+
+  // right column: line counter + next line
+  ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+  ctx.font = `600 10px ${FONT_UI}`; ctx.fillStyle = C.muted; ctx.fillText('L I N E', 1240, 292);
+  ctx.font = `200 64px ${FONT_UI}`; ctx.fillStyle = C.sec; ctx.fillText(String(s.idx + 1).padStart(2, '0'), 1196, 356);
+  ctx.font = `300 18px ${FONT_UI}`; ctx.fillStyle = C.muted; ctx.fillText('/' + N, 1240, 356);
+  ctx.fillStyle = C.gold; ctx.fillRect(1212, 372, 28, 1.5);
+  ctx.font = `600 10px ${FONT_UI}`; ctx.fillStyle = C.muted; ctx.fillText('N E X T', 1240, 404);
+  ctx.font = `400 14px ${FONT_JA}`; ctx.fillStyle = C.sec; ctx.fillText(LYRICS[(s.idx + 1) % N].ja, 1240, 428);
+  ctx.font = `400 12px ${FONT_ZH}`; ctx.fillStyle = C.muted; ctx.fillText(LYRICS[(s.idx + 1) % N].zh, 1240, 448);
+  ctx.textAlign = 'left';
+  // progress: thin arc along record rim
+  ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(CX, CY, R + 14, -Math.PI / 2 - .05, .35); ctx.stroke();
+  ctx.strokeStyle = C.gold;
+  ctx.beginPath(); ctx.arc(CX, CY, R + 14, -Math.PI / 2 - .05, -Math.PI / 2 - .05 + (.4 + Math.PI / 2) * s.progress); ctx.stroke();
+}, {trans: 1.1});
+function mixColor(a, b, k) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ch = sh => Math.round(lerp(pa >> sh & 255, pb >> sh & 255, k));
+  return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
+}
+</script></body></html>

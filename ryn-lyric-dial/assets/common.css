@@ -1,0 +1,12 @@
+html,body{margin:0;height:100%;background:#0c111c;overflow:hidden}
+body{font-family:Inter,"Noto Sans CJK JP","Noto Sans CJK SC",sans-serif;color:#e6e8ee}
+#stage{position:absolute;left:0;top:0;width:1280px;height:800px;transform-origin:0 0;background:#111725;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0;width:1280px;height:800px}
+.hud{position:absolute;left:36px;top:28px;font-size:12px;letter-spacing:.08em;color:#6b7385;text-transform:uppercase;pointer-events:none}
+.hud b{color:#a3aab8;font-weight:600;letter-spacing:.2em}
+.track{position:absolute;pointer-events:none}
+.track .t{font-size:18px;font-weight:500;color:#e6e8ee;letter-spacing:.01em}
+.track .a{font-size:12px;color:#a3aab8;margin-top:4px;letter-spacing:.04em}
+.track .m{font-size:11px;color:#6b7385;margin-top:2px;letter-spacing:.04em}
+.foot{position:absolute;left:36px;bottom:24px;font-size:11px;color:#6b7385;letter-spacing:.12em;text-transform:uppercase;pointer-events:none}
+.foot span{color:#b8955a}

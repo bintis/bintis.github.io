@@ -1,0 +1,110 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>Ryn · 仪表 Gauge</title>
+<link rel="stylesheet" href="../assets/common.css"></head><body>
+<div id="stage">
+  <div class="hud"><b>RYN</b> &nbsp;·&nbsp; Lyrics · Gauge</div>
+  <div class="track" style="right:40px;top:26px;text-align:right">
+    <div class="t">夜明けの航路 <span style="color:#6b7385;font-weight:400">(demo)</span></div>
+    <div class="a">soleil de minuit · Placeholder lyrics</div>
+  </div>
+</div>
+<script src="../assets/common.js"></script>
+<script>
+const CX = 640, CY = 838, TAU = Math.PI * 2, D2R = Math.PI / 180;
+const A0 = -166 * D2R, A1 = -14 * D2R;
+const angOf = x => A0 + (A1 - A0) * x / (N - 1);
+const R_RIM = 548, R_LAB = 300, R_PROG = 596;
+const P = (r, a) => [CX + Math.cos(a) * r, CY + Math.sin(a) * r];
+boot(({ctx, cover}, t, s) => {
+  bgFill(ctx, CX, 500, 900);
+  // needle position: linear between real indices (so the last->first line sweeps back), with a meter-like overshoot
+  const prev = mod(s.idx - 1, N);
+  const kb = easeOutBack(clamp(s.local / 1.0), 1.15);
+  const ki = easeInOutCubic(clamp(s.local / 0.8));
+  const needleX = lerp(prev, s.idx, kb) + Math.sin(t * 23) * .02 * fakeLevel(t);
+
+  // dial face
+  const fg = ctx.createRadialGradient(CX, CY, 100, CX, CY, R_PROG + 40);
+  fg.addColorStop(0, '#192235'); fg.addColorStop(1, '#131a29');
+  ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(CX, CY, R_PROG + 36, Math.PI, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 1;
+  for (const r of [R_PROG + 36, R_RIM, R_RIM - 26, 270]) { ctx.beginPath(); ctx.arc(CX, CY, r, A0 - .06, A1 + .06); ctx.stroke(); }
+
+  // progress scale (song time)
+  const dur = SONG_DUR;
+  ctx.beginPath();
+  for (let sec = 0; sec <= dur; sec++) {
+    const a = A0 + (A1 - A0) * sec / dur, major = sec % 6 === 0, L = major ? 12 : 5;
+    const [x1, y1] = P(R_PROG, a), [x2, y2] = P(R_PROG - L, a); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.stroke();
+  ctx.font = `500 10px ${FONT_UI}`; ctx.fillStyle = C.muted; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let sec = 0; sec <= dur; sec += 6) {
+    const a = A0 + (A1 - A0) * sec / dur, [x, y] = P(R_PROG + 16, a);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a + Math.PI / 2); ctx.fillText(fmtTime(sec), 0, 0); ctx.restore();
+  }
+  const pa = A0 + (A1 - A0) * s.progress;
+  ctx.strokeStyle = C.gold; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(CX, CY, R_PROG + 2, A0, pa); ctx.stroke();
+  { const [x, y] = P(R_PROG + 2, pa); ctx.fillStyle = C.goldHi; ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); ctx.fill(); }
+
+  // line ticks on the rim
+  for (let i = 0; i < N; i++) {
+    const a = angOf(i), f = clamp(1 - Math.abs(i - needleX));
+    const [x1, y1] = P(R_RIM, a), [x2, y2] = P(R_RIM - 26, a);
+    ctx.strokeStyle = f > .02 ? rgba(C.gold, .4 + .6 * f) : 'rgba(255,255,255,.3)'; ctx.lineWidth = f > .5 ? 2 : 1;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    // minor ticks between
+    if (i < N - 1) for (let m = 1; m < 4; m++) {
+      const am = angOf(i + m / 4), [a1, b1] = P(R_RIM, am), [a2, b2] = P(R_RIM - 8, am);
+      ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(a1, b1); ctx.lineTo(a2, b2); ctx.stroke();
+    }
+    // number at rim
+    const [nx, ny] = P(R_RIM - 40, a);
+    ctx.font = `600 10px ${FONT_UI}`; ctx.fillStyle = f > .02 ? rgba(C.gold, .5 + .5 * f) : C.muted;
+    ctx.save(); ctx.translate(nx, ny); ctx.rotate(a + Math.PI / 2); ctx.fillText(String(i + 1).padStart(2, '0'), 0, 0); ctx.restore();
+  }
+
+  // scale labels: each lyric line, radial, beside its tick
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < N; i++) {
+    const a = angOf(i) - 4.6 * D2R, f = clamp(1 - Math.abs(i - (lerp(prev, s.idx, ki))));
+    const [x, y] = P(R_LAB, a);
+    ctx.font = `${f > .5 ? 500 : 400} 14px ${FONT_JA}`;
+    ctx.fillStyle = f > .02 ? (f > .5 ? C.goldHi : C.sec) : (i < s.idx ? C.muted : '#8a92a3');
+    ctx.globalAlpha = f > .02 ? .6 + .4 * f : .7;
+    ctx.save(); ctx.translate(x, y);
+    if (Math.cos(a) < 0) { ctx.rotate(a + Math.PI); ctx.textAlign = 'right'; } else { ctx.rotate(a); ctx.textAlign = 'left'; }
+    ctx.fillText(LYRICS[i].ja, 0, 0); ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+
+  // needle
+  const na = angOf(needleX);
+  ctx.save(); ctx.translate(CX, CY); ctx.rotate(na);
+  ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4;
+  ctx.fillStyle = C.gold;
+  ctx.beginPath(); ctx.moveTo(-30, -3.5); ctx.lineTo(R_RIM - 4, -.6); ctx.lineTo(R_RIM - 4, .6); ctx.lineTo(-30, 3.5); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  // hub = cover
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = 30; ctx.fillStyle = '#0d1220';
+  ctx.beginPath(); ctx.arc(CX, CY, 132, 0, TAU); ctx.fill(); ctx.restore();
+  drawCover(ctx, cover, CX, CY, 124, 0);
+  ctx.strokeStyle = rgba(C.gold, .6); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(CX, CY, 132, 0, TAU); ctx.stroke();
+  // little VU legend
+  ctx.font = `600 10px ${FONT_UI}`; ctx.fillStyle = C.muted; ctx.textAlign = 'center';
+  ctx.fillText('LYRIC  ·  LINE', CX, CY - 168);
+
+  // big current line above the dial (cross-fade + rise)
+  const cur = LYRICS[s.idx], old = LYRICS[prev];
+  const drawBig = (L, a, dy) => {
+    ctx.globalAlpha = a; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.font = `500 38px ${FONT_JA}`; ctx.fillStyle = C.text; ctx.fillText(L.ja, CX, 132 + dy);
+    ctx.font = `400 17px ${FONT_ZH}`; ctx.fillStyle = C.sec; ctx.fillText(L.zh, CX, 168 + dy);
+  };
+  drawBig(old, Math.pow(1 - ki, 3), -22 * ki);
+  drawBig(cur, ki, 14 * (1 - ki));
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = C.gold; ctx.fillRect(CX - 14, 186, 28, 1.5);
+  ctx.font = `500 11px ${FONT_UI}`; ctx.fillStyle = C.muted; ctx.textAlign = 'left';
+  ctx.fillText(fmtTime(s.song) + ' / ' + fmtTime(SONG_DUR), 36, 772);
+});
+</script></body></html>

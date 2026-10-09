@@ -1,0 +1,21 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>Ryn · 歌词盘 Lyric Dial concepts</title>
+<style>
+body{margin:0;background:#111725;color:#e6e8ee;font-family:Inter,"Noto Sans CJK SC",sans-serif;padding:40px 48px}
+h1{font-weight:500;font-size:22px;margin:0 0 4px}p.sub{color:#6b7385;font-size:13px;margin:0 0 28px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(520px,1fr));gap:28px}
+a.card{display:block;text-decoration:none;color:inherit;background:#141a28;border:1px solid #222a3a;border-radius:8px;overflow:hidden;transition:border-color .2s}
+a.card:hover{border-color:#b8955a}
+a.card img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover}
+.meta{padding:14px 16px}.meta .n{color:#b8955a;font-size:12px;letter-spacing:.12em}.meta .t{font-size:17px;margin:4px 0}.meta .d{color:#a3aab8;font-size:13px;line-height:1.6}
+.meta .g{color:#6b7385;font-size:12px;margin-top:8px;line-height:1.6}
+</style></head><body>
+<h1>Ryn · 歌词盘 Lyric Dial</h1>
+<p class="sub">6 concepts · 1280×800 · placeholder lyrics · append <code>?t=12.5</code> to freeze a moment</p>
+<div class="grid">
+<a class="card" href="concept-1/index.html"><img src="shots/1.png"><div class="meta"><div class="n">CONCEPT 01</div><div class="t">唱片沟槽 · Vinyl Groove</div><div class="d">封面作唱片中心标，歌词刻在同心沟槽里，唱臂针尖点亮当前行，歌词随播放向内推进。</div><div class="g">Godot: _draw() 同心圆 + 逐字 draw_set_transform 弧形文字；标签旋转用 TextureRect.rotation。</div></div></a>
+<a class="card" href="concept-2/index.html"><img src="shots/2.png"><div class="meta"><div class="n">CONCEPT 02</div><div class="t">星盘 · Astrolabe</div><div class="d">多层刻度环以不同速度转动，歌词刻在外环上，当前行转到 12 点刻度处摆正并点亮。</div><div class="g">Godot: 每环一个 Node2D(rotation) + _draw 刻度；歌词 draw_set_transform 旋转直排文字。</div></div></a>
+<a class="card" href="concept-3/index.html"><img src="shots/3.png"><div class="meta"><div class="n">CONCEPT 03</div><div class="t">仪表 · Gauge</div><div class="d">底部半圆模拟表盘，歌词沿弧排成刻度标签，指针带回弹扫向当前行，上方大字显示。</div><div class="g">Godot: 刻度烘焙一次（静态 _draw），每帧只重画指针 + 两行大字；Tween TRANS_BACK。</div></div></a>
+<a class="card" href="concept-4/index.html"><img src="shots/4.png"><div class="meta"><div class="n">CONCEPT 04</div><div class="t">八音盒滚筒 · Music-box Drum</div><div class="d">横置的透视滚筒印着歌词，当前行在正面平展，其余行随曲面压缩远去；左侧封面铭牌。</div><div class="g">Godot: draw_set_transform(scale=(sx,cosφ)) 逐行绘制 + 圆柱明暗 shader 或渐变纹理。</div></div></a>
+<a class="card" href="concept-5/index.html"><img src="shots/5.png"><div class="meta"><div class="n">CONCEPT 05</div><div class="t">星轨 · Orbit</div><div class="d">封面为中心天体，歌词沿倾斜椭圆轨道运行，抵达近日点时放大落下；外圈波形环随音频起伏。</div><div class="g">Godot: 轨道点参数方程 + z 排序（后半先画）；波形环用 AudioEffectSpectrumAnalyzer + draw_multiline。</div></div></a>
+<a class="card" href="concept-7b/index.html"><img src="shots/7b.png"><div class="meta"><div class="n">CONCEPT 06 · GEAR (7b)</div><div class="t">光轮 · Luminous Train</div><div class="d">大表盘偏左、部分出画。粗齿外圈（40 齿）驱动盘内一条一眼可读的齿轮链：齿圈 → 大轮 → 中轮 → 小轮，大轮另带一只小轮；无行星架、无夹板、无连杆。齿轮为带暗描边的发光细线，封面罩轻雾，只在辐条窗内清晰明亮。光点随节拍沿节圆和啮合点闪动；右侧歌词沿同心弧，当前行卡拉OK式由金到白点亮。</div><div class="g">Godot: 每轮一张细线贴图 + 一张阴影贴图，只改 rotation（按齿数比计算）；清晰窗口用 SubViewport 遮罩 + 封面 shader 混合；卡拉OK 用 shader 阈值。<a href="shots/7b-detail.png" style="color:#b8955a">2× 细节图</a> · <a href="shots/7b-vs-ref.png" style="color:#b8955a">与参考对比</a></div></div></a>
+</div></body></html>

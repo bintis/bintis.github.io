@@ -1,4 +1,4 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>Ryn · 光轮 II Luminous Train</title>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>Ryn · 光轮 II Luminous Planetary</title>
 <link rel="stylesheet" href="../assets/common.css">
 <style>
 .hud{letter-spacing:.34em;font-weight:300;font-size:11px;color:#6b7385}
@@ -17,14 +17,14 @@
 </div>
 <script src="../assets/common.js"></script>
 <script>
-/* Concept 7b — 光轮 II Luminous Train
-   An engraved Roman-numeral band (6b style) whose 48 inner teeth drive a plain visible chain inside the dial:
-   Ring(48 int) → L(28) → M(16) → S(10)   and   L(28) → S2(12).  No carrier, no bridges, no arms.
+/* Concept 7b — 光轮 II Luminous Planetary
+   A true planetary set: the engraved Roman-numeral band (6b style) is the ring gear (48 inner teeth),
+   three planets (12) mesh with it and with the central sun (24). Carrier = a dotted hairline only; no arms, no bridges.
    Wheels are luminous hairlines (with a dark under-stroke so they read on bright art);
    the cover is veiled and turns crisp inside the wheels' spoke windows. Ring rotation = lyric arc. */
 const TAU = Math.PI * 2, CX = 200, CY = 400;
 const MI = 10, ZRI = 48, RRI = MI * ZRI / 2;          // ring internal: pitch R 240
-const BAND_I = RRI + 1.2 * MI, BAND_O = 326;          // engraved band (6b style) between the inner-teeth root and Ø 652
+const BAND_I = RRI + 1.2 * MI, BAND_O = 340;          // engraved band (6b style) between the inner-teeth root and Ø 680
 const R_COV = BAND_O, R_TXT = 392;
 const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 const STEP = 15 * Math.PI / 180;   // 1 line = 15°: 12 lines = 180° = 24 inner teeth → seamless loop
@@ -55,18 +55,11 @@ function windowShape(a0, a1, r0, r1, w0, w1) {
 const toPath = (pts, p = new Path2D()) => { pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath(); return p; };
 const circ = (r, p = new Path2D(), x = 0, y = 0) => { p.moveTo(x + r, y); p.arc(x, y, r, 0, TAU); return p; };
 
-// ── the train (positions solved so every pair sits exactly at its centre distance)
-const G = {};
-{ const mk = (Z, n, hub) => ({Z, R: MI * Z / 2, n, hub});
-  G.L = mk(28, 5, 24); G.M = mk(16, 4, 16); G.S = mk(10, 3, 11); G.S2 = mk(12, 3, 13);
-  const at = (o, a, d) => ({x: o.x + Math.cos(a) * d, y: o.y + Math.sin(a) * d});
-  const O = {x: CX, y: CY};
-  Object.assign(G.L, at(O, -0.40, RRI - G.L.R));               // internal mesh with the ring
-  Object.assign(G.M, at(G.L, 2.70, G.L.R + G.M.R));
-  Object.assign(G.S, at(G.M, 0.90, G.M.R + G.S.R));
-  Object.assign(G.S2, at(G.L, 3.55, G.L.R + G.S2.R)); }
+// ── the planetary set: Zr = Zs + 2·Zp (48 = 24 + 2·12), (Zs + Zr)/3 = 24 → three equally spaced planets mesh
+const ZS = 24, ZP = 12, NP = 3;
+const SUN = {Z: ZS, R: MI * ZS / 2, n: 5, hub: 24}, PLANET = {Z: ZP, R: MI * ZP / 2, n: 3, hub: 11};
+const RC = SUN.R + PLANET.R;                                   // carrier radius 180 (= RRI − Rp)
 function meshExt(a, b, thA) { const psi = Math.atan2(b.y - a.y, b.x - a.x); return psi + Math.PI - Math.PI / b.Z + (a.Z / b.Z) * (psi - thA); }
-function meshInt(thR, b) { const psi = Math.atan2(b.y - CY, b.x - CX); return psi - Math.PI / b.Z - (ZRI / b.Z) * (psi - thR); }
 
 // ── bake: line art = dark under-stroke (legibility on bright art) + glow + hairline, weight hierarchy
 function bakeWheel(def) {
@@ -98,14 +91,14 @@ function bake(cover) {
     g.fillStyle = 'rgba(16,21,34,.66)'; g.beginPath(); g.arc(R_COV, R_COV, R_COV, 0, TAU); g.arc(R_COV, R_COV, RRI + 1.2 * MI, 0, TAU, true); g.fill();
     B.veil = c; }
   { const [c, g] = mk(); g.filter = 'saturate(1.03) contrast(1.03)'; if (cover) g.drawImage(cover, 0, 0, S, S); B.crisp = c; }
-  for (const k of ['L', 'M', 'S', 'S2']) { G[k].def = wheelDef(G[k]); B[k] = bakeWheel(G[k].def); }
+  SUN.def = wheelDef(SUN); B.sun = bakeWheel(SUN.def); PLANET.def = wheelDef(PLANET); B.planet = bakeWheel(PLANET.def);
   { // ring = engraved band (thin concentric rings + one quiet tick per lyric step) with the drive teeth on its inner edge
     const inner = toPath(teeth(ZRI, RRI, MI, true)), ticks = new Path2D();
     for (let k = 0; k < 24; k++) { const a = k * STEP; ticks.moveTo(Math.cos(a) * BAND_O, Math.sin(a) * BAND_O); ticks.lineTo(Math.cos(a) * (BAND_O - 6), Math.sin(a) * (BAND_O - 6)); }
     B.ring = bakeWheel({size: 2 * BAND_O + 16, wins: [],
       lines: [[circ(BAND_O), .42], [inner, .5], [ticks, .3], [circ(BAND_O - 22), .12], [circ(BAND_I + 7), .1]]}); }
   const shadow = c => { const t = document.createElement('canvas'); t.width = t.height = c.width; const g = t.getContext('2d'); g.filter = `blur(${3 * SS}px) brightness(0)`; g.drawImage(c, 0, 0); t.size = c.size; return t; };
-  for (const k of ['ring', 'L', 'M', 'S', 'S2']) B[k + 'Sh'] = shadow(B[k]);
+  for (const k of ['ring', 'sun', 'planet']) B[k + 'Sh'] = shadow(B[k]);
   B.mask = document.createElement('canvas');
 }
 function put(ctx, c, x, y, a, alpha = 1) { ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); ctx.rotate(a); ctx.drawImage(c, -c.size / 2, -c.size / 2, c.size, c.size); ctx.restore(); }
@@ -122,11 +115,15 @@ boot(({ctx, cover}, t, s) => {
 
   // kinematics
   const thR = -s.p * STEP;
-  const th = {}; th.L = meshInt(thR, G.L); th.M = meshExt(G.L, G.M, th.L); th.S = meshExt(G.M, G.S, th.M); th.S2 = meshExt(G.L, G.S2, th.L);
+  // planetary kinematics: ring = lyric arc, carrier drifts slowly, sun by Willis (+ phase so all teeth mesh)
+  const thC = t * .02, thS = thC * (1 + ZRI / ZS) - (ZRI / ZS) * thR + Math.PI * ZP / ZS;
+  const W = [{tex: 'sun', def: SUN.def, x: CX, y: CY, th: thS, d: 1}];
+  for (let i = 0; i < NP; i++) { const psi = thC + i * TAU / NP, w = {Z: ZP, x: CX + Math.cos(psi) * RC, y: CY + Math.sin(psi) * RC};
+    W.push({tex: 'planet', def: PLANET.def, x: w.x, y: w.y, th: meshExt({x: CX, y: CY, Z: ZS}, w, thS), d: 1.3}); }
   const px = Math.sin(t * .13) * 2, py = Math.cos(t * .11) * 1.5;
   const beat = Math.exp(-mod(t, .5) / .12) * (mod(Math.floor(t / .5), 4) === 0 ? 1 : .55);
   const soft = .5 - .5 * Math.cos(TAU * mod(t, 2) / 2);   // one slow swell per bar
-  const dep = {ring: .4, L: 1, M: 1.25, S: 1.5, S2: 1.5};   // parallax depth: smaller wheels sit nearer the glass
+  const dep = {ring: .4};   // parallax depth: ring deepest, planets nearest the glass
 
   for (const [bx, by, br] of BOKEH) { const g = ctx.createRadialGradient(bx - px * 2, by - py * 2, 0, bx - px * 2, by - py * 2, br); g.addColorStop(0, 'rgba(170,190,230,.05)'); g.addColorStop(1, 'rgba(170,190,230,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx - px * 2, by - py * 2, br, 0, TAU); ctx.fill(); }
 
@@ -136,7 +133,7 @@ boot(({ctx, cover}, t, s) => {
   { const S = 2 * R_COV, mc = B.mask; if (mc.width !== Math.round(S * dpr)) mc.width = mc.height = Math.round(S * dpr);
     const g = mc.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, mc.width, mc.height); g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.fillStyle = '#fff'; g.shadowColor = '#fff'; g.shadowBlur = 6 * dpr;
-    for (const k of ['L', 'M', 'S', 'S2']) { const w = G[k]; g.save(); g.translate(w.x - CX + R_COV + px * dep[k], w.y - CY + R_COV + py * dep[k]); g.rotate(th[k]); for (const p of w.def.wins) g.fill(p); g.restore(); }
+    for (const w of W) { g.save(); g.translate(w.x - CX + R_COV + px * w.d, w.y - CY + R_COV + py * w.d); g.rotate(w.th); for (const p of w.def.wins) g.fill(p); g.restore(); }
     g.shadowBlur = 0; g.globalCompositeOperation = 'source-in'; g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(B.crisp, 0, 0, mc.width, mc.height); g.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = .95 + .05 * soft; ctx.drawImage(mc, CX - R_COV, CY - R_COV, S, S); ctx.globalAlpha = 1; }
   { ctx.save(); ctx.beginPath(); ctx.arc(CX, CY, R_COV, 0, TAU); ctx.clip(); ctx.globalCompositeOperation = 'screen';
@@ -147,7 +144,7 @@ boot(({ctx, cover}, t, s) => {
   // shadows, then the wheels
   const O = [5, 8];
   put(ctx, B.ringSh, CX + O[0] * .5, CY + O[1] * .5, thR, .45);
-  for (const k of ['L', 'M', 'S', 'S2']) put(ctx, B[k + 'Sh'], G[k].x + O[0] * dep[k], G[k].y + O[1] * dep[k], th[k], .45);
+  for (const w of W) put(ctx, B[w.tex + 'Sh'], w.x + O[0] * w.d, w.y + O[1] * w.d, w.th, .45);
   put(ctx, B.ring, CX + px * dep.ring, CY + py * dep.ring, thR);
   // Roman numerals engraved on the band, riding with the ring (24 slots = two turns of I–XII), current one gold
   ctx.font = `300 10px ${FONT_UI}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -155,13 +152,16 @@ boot(({ctx, cover}, t, s) => {
     const d0 = rel(i, s.p), d = w ? d0 + (d0 < 0 ? 12 : -12) : d0, a = d * STEP, f = w ? 0 : focus(d0);
     ctx.save(); ctx.translate(CX + px * dep.ring + Math.cos(a) * (BAND_O - 11), CY + py * dep.ring + Math.sin(a) * (BAND_O - 11)); ctx.rotate(a + Math.PI / 2);
     ctx.fillStyle = f > .02 ? rgba(C.gold, .35 + .5 * f) : `rgba(${INK},.24)`; ctx.fillText(ROMAN[i], 0, 0); ctx.restore(); }
-  for (const k of ['L', 'M', 'S', 'S2']) put(ctx, B[k], G[k].x + px * dep[k], G[k].y + py * dep[k], th[k]);
+  // carrier: nothing but a dotted hairline through the planet centres
+  ctx.save(); ctx.setLineDash([2, 6]); ctx.lineWidth = .7; ctx.strokeStyle = `rgba(${INK},.16)`; ctx.beginPath(); ctx.arc(CX + px * 1.15, CY + py * 1.15, RC, 0, TAU); ctx.stroke(); ctx.restore();
+  for (const w of W) put(ctx, B[w.tex], w.x + px * w.d, w.y + py * w.d, w.th);
+  for (const w of W.slice(1)) { ctx.strokeStyle = `rgba(${INK},.5)`; ctx.lineWidth = .8; ctx.beginPath(); ctx.arc(w.x + px * w.d, w.y + py * w.d, 3, 0, TAU); ctx.stroke(); }   // planet pins
 
   // calm light along the pitch circles: a slow, faint glint that only swells a little on the beat
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
   const comet = (x, y, r, a, len, al) => { for (let k = 0; k < 6; k++) { ctx.strokeStyle = `rgba(${INK},${al * (1 - k / 6)})`; ctx.lineWidth = 1.2 - k * .12; ctx.beginPath(); ctx.arc(x, y, r, a - (k + 1) * len / 6, a - k * len / 6); ctx.stroke(); } };
-  comet(G.L.x + px, G.L.y + py, G.L.R, t * .35, 1.2, .09 + .07 * soft);
-  comet(G.M.x + px * 1.25, G.M.y + py * 1.25, G.M.R, -t * .5 + 2, 1.2, .07 + .05 * soft);
+  comet(CX + px, CY + py, SUN.R, t * .35, 1.2, .09 + .07 * soft);
+  comet(CX + px * .4, CY + py * .4, RRI, -t * .12 + 2, .7, .06 + .05 * soft);
   ctx.restore();
 
   // glass crescent highlight + rim

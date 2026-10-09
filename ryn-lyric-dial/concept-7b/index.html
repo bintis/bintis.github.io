@@ -21,7 +21,7 @@
    A true planetary set: the engraved Roman-numeral band (6b style) is the ring gear (48 inner teeth),
    three planets (12) mesh with it and with the central sun (24). Carrier = a dotted hairline only; no arms, no bridges.
    Wheels are luminous hairlines (with a dark under-stroke so they read on bright art);
-   the cover is veiled and turns crisp inside the wheels' spoke windows. Ring rotation = lyric arc. */
+   the cover is fully clear; the wheels' solid parts are translucent frosted glass, their windows fully clear. Ring rotation = lyric arc. */
 const TAU = Math.PI * 2, CX = 200, CY = 400;
 const MI = 10, ZRI = 48, RRI = MI * ZRI / 2;          // ring internal: pitch R 240
 const BAND_I = RRI + 1.2 * MI, BAND_O = 340;          // engraved band (6b style) between the inner-teeth root and Ø 680
@@ -77,7 +77,7 @@ function wheelDef(w) {
   const sw = w.R * .07, wins = [];
   for (let k = 0; k < w.n; k++) wins.push(toPath(windowShape(k * TAU / w.n, (k + 1) * TAU / w.n, w.hub + 5, rRoot - rim, sw * .9, sw * .6)));
   const body = new Path2D(); body.addPath(out);
-  return {size: 2 * (w.R + m) + 16, wins, body, frost: .07,
+  return {size: 2 * (w.R + m) + 16, wins, body, frost: 0,
     lines: [[out, .85], ...wins.map(p => [p, .4]), [circ(w.hub), .5], [circ(w.hub * .42), .35], [circ(w.R), .2, true]]};
 }
 const B = {};
@@ -85,19 +85,23 @@ function bake(cover) {
   const S = 2 * R_COV;
   const mk = () => { const c = document.createElement('canvas'); c.width = c.height = S * SS; const g = c.getContext('2d'); g.scale(SS, SS); return [c, g]; };
   { const [c, g] = mk(); g.beginPath(); g.arc(R_COV, R_COV, R_COV, 0, TAU); g.clip();
-    g.filter = 'blur(1.6px) saturate(.8) brightness(.67)'; if (cover) g.drawImage(cover, -4, -4, S + 8, S + 8); g.filter = 'none';
-    g.globalCompositeOperation = 'multiply'; g.fillStyle = 'rgb(182,195,228)'; g.fillRect(0, 0, S, S); g.globalCompositeOperation = 'source-over';
-    // ring band under heavier frost so the rim reads as one bold part
+    // the cover itself, crisp and near full brightness; only a very light vignette toward the rim
+    g.filter = 'saturate(1.03) contrast(1.03)'; if (cover) g.drawImage(cover, 0, 0, S, S); g.filter = 'none';
+    const vg = g.createRadialGradient(R_COV, R_COV, BAND_I * .72, R_COV, R_COV, BAND_I); vg.addColorStop(0, 'rgba(10,14,22,0)'); vg.addColorStop(1, 'rgba(10,14,22,.22)');
+    g.fillStyle = vg; g.fillRect(0, 0, S, S);
+    // the engraved band (unchanged): darker so the rim reads as one part
     g.fillStyle = 'rgba(16,21,34,.66)'; g.beginPath(); g.arc(R_COV, R_COV, R_COV, 0, TAU); g.arc(R_COV, R_COV, RRI + 1.2 * MI, 0, TAU, true); g.fill();
     B.veil = c; }
-  { const [c, g] = mk(); g.filter = 'saturate(1.03) contrast(1.03)'; if (cover) g.drawImage(cover, 0, 0, S, S); B.crisp = c; }
+  { // frosted glass for the gears' solid parts: the cover, blurred, with a ~20% cool-dark tint and a faint sheen
+    const [c, g] = mk(); g.filter = 'blur(6px) saturate(.9) brightness(.9)'; if (cover) g.drawImage(cover, -10, -10, S + 20, S + 20); g.filter = 'none';
+    g.fillStyle = 'rgba(12,17,28,.2)'; g.fillRect(0, 0, S, S); g.fillStyle = `rgba(${INK},.05)`; g.fillRect(0, 0, S, S); B.frost = c; }
   SUN.def = wheelDef(SUN); B.sun = bakeWheel(SUN.def); PLANET.def = wheelDef(PLANET); B.planet = bakeWheel(PLANET.def);
   { // ring = engraved band (thin concentric rings + one quiet tick per lyric step) with the drive teeth on its inner edge
     const inner = toPath(teeth(ZRI, RRI, MI, true)), ticks = new Path2D();
     for (let k = 0; k < 24; k++) { const a = k * STEP; ticks.moveTo(Math.cos(a) * BAND_O, Math.sin(a) * BAND_O); ticks.lineTo(Math.cos(a) * (BAND_O - 6), Math.sin(a) * (BAND_O - 6)); }
     B.ring = bakeWheel({size: 2 * BAND_O + 16, wins: [],
       lines: [[circ(BAND_O), .42], [inner, .5], [ticks, .3], [circ(BAND_O - 22), .12], [circ(BAND_I + 7), .1]]}); }
-  const shadow = c => { const t = document.createElement('canvas'); t.width = t.height = c.width; const g = t.getContext('2d'); g.filter = `blur(${3 * SS}px) brightness(0)`; g.drawImage(c, 0, 0); t.size = c.size; return t; };
+  const shadow = c => { const t = document.createElement('canvas'); t.width = t.height = c.width; const g = t.getContext('2d'); g.filter = `blur(${6 * SS}px) brightness(0)`; g.drawImage(c, 0, 0); t.size = c.size; return t; };
   for (const k of ['ring', 'sun', 'planet']) B[k + 'Sh'] = shadow(B[k]);
   B.mask = document.createElement('canvas');
 }
@@ -127,24 +131,25 @@ boot(({ctx, cover}, t, s) => {
 
   for (const [bx, by, br] of BOKEH) { const g = ctx.createRadialGradient(bx - px * 2, by - py * 2, 0, bx - px * 2, by - py * 2, br); g.addColorStop(0, 'rgba(170,190,230,.05)'); g.addColorStop(1, 'rgba(170,190,230,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx - px * 2, by - py * 2, br, 0, TAU); ctx.fill(); }
 
-  // cover under the veil + crisp windows
+  // cover clear; gear bodies are frosted glass (windows stay fully clear)
   ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 60; ctx.fillStyle = '#0d121c'; ctx.beginPath(); ctx.arc(CX, CY, R_COV, 0, TAU); ctx.fill(); ctx.restore();
   ctx.drawImage(B.veil, CX - R_COV, CY - R_COV, 2 * R_COV, 2 * R_COV);
   { const S = 2 * R_COV, mc = B.mask; if (mc.width !== Math.round(S * dpr)) mc.width = mc.height = Math.round(S * dpr);
     const g = mc.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, mc.width, mc.height); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.fillStyle = '#fff'; g.shadowColor = '#fff'; g.shadowBlur = 6 * dpr;
-    for (const w of W) { g.save(); g.translate(w.x - CX + R_COV + px * w.d, w.y - CY + R_COV + py * w.d); g.rotate(w.th); for (const p of w.def.wins) g.fill(p); g.restore(); }
-    g.shadowBlur = 0; g.globalCompositeOperation = 'source-in'; g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(B.crisp, 0, 0, mc.width, mc.height); g.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = .95 + .05 * soft; ctx.drawImage(mc, CX - R_COV, CY - R_COV, S, S); ctx.globalAlpha = 1; }
+    g.fillStyle = '#fff';
+    for (const w of W) { g.save(); g.translate(w.x - CX + R_COV + px * w.d, w.y - CY + R_COV + py * w.d); g.rotate(w.th); g.fill(w.def.body);
+      g.globalCompositeOperation = 'destination-out'; for (const p of w.def.wins) g.fill(p); g.globalCompositeOperation = 'source-over'; g.restore(); }
+    g.globalCompositeOperation = 'source-in'; g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(B.frost, 0, 0, mc.width, mc.height); g.globalCompositeOperation = 'source-over';
+    ctx.drawImage(mc, CX - R_COV, CY - R_COV, S, S); }
   { ctx.save(); ctx.beginPath(); ctx.arc(CX, CY, R_COV, 0, TAU); ctx.clip(); ctx.globalCompositeOperation = 'screen';
     const u = mod(t / 11, 1), x0 = CX - 560 + u * 1120, sw = ctx.createLinearGradient(x0 - 150, CY - 320, x0 + 150, CY + 320);
     sw.addColorStop(0, 'rgba(200,214,240,0)'); sw.addColorStop(.5, 'rgba(200,214,240,.06)'); sw.addColorStop(1, 'rgba(200,214,240,0)');
     ctx.fillStyle = sw; ctx.fillRect(CX - R_COV, CY - R_COV, 2 * R_COV, 2 * R_COV); ctx.restore(); }
 
   // shadows, then the wheels
-  const O = [5, 8];
-  put(ctx, B.ringSh, CX + O[0] * .5, CY + O[1] * .5, thR, .45);
-  for (const w of W) put(ctx, B[w.tex + 'Sh'], w.x + O[0] * w.d, w.y + O[1] * w.d, w.th, .45);
+  const O = [3, 5];
+  put(ctx, B.ringSh, CX + O[0] * .5, CY + O[1] * .5, thR, .14);
+  for (const w of W) put(ctx, B[w.tex + 'Sh'], w.x + O[0] * w.d, w.y + O[1] * w.d, w.th, .14);
   put(ctx, B.ring, CX + px * dep.ring, CY + py * dep.ring, thR);
   // Roman numerals engraved on the band, riding with the ring (24 slots = two turns of I–XII), current one gold
   ctx.font = `300 10px ${FONT_UI}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';

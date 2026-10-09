@@ -11,9 +11,16 @@
 </div>
 <script src="../assets/common.js"></script>
 <script>
-const CX = 230, CY = 650, R = 640, RC = 430, GAP = 60, LABEL = 128;
-const A = -60 * Math.PI / 180;       // needle angle (where every line starts)
-const PIV = {x: 64, y: 40};
+const CX = 230, CY = 650, R = 640, LABEL = 128;
+const PIV = {x: 64, y: 40}, ARM = 470;             // tonearm pivot + length (fixed)
+const R_OUT = 610, R_IN = 178, RETURN = 1.0;       // lead-in groove → run-out groove near the label
+const rAt = tt => lerp(R_OUT, R_IN, clamp(tt / SONG_DUR));          // needle radius at song time tt
+const grooveR = i => rAt((i + .5) * LINE_DUR);                       // line i's groove = needle radius mid-line
+const easeInOutSine = x => -(Math.cos(Math.PI * x) - 1) / 2;
+function tipAt(r) {   // where the arm's arc (around PIV, radius ARM) crosses groove radius r (right-hand solution)
+  const dx = CX - PIV.x, dy = CY - PIV.y, d = Math.hypot(dx, dy), a = (ARM * ARM - r * r + d * d) / (2 * d), h = Math.sqrt(Math.max(0, ARM * ARM - a * a));
+  return {x: PIV.x + a * dx / d + h * dy / d, y: PIV.y + a * dy / d - h * dx / d};
+}
 boot(({ctx, cover}, t, s) => {
   bgFill(ctx, 900, 300, 1100);
   const rot = t * 0.35;               // slow visual spin
@@ -50,45 +57,42 @@ boot(({ctx, cover}, t, s) => {
   ctx.fillStyle = C.bg; ctx.beginPath(); ctx.arc(CX, CY, 7, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.stroke();
 
-  // lyric lines in grooves
-  ctx.textBaseline = 'alphabetic';
-  const items = [];
+  // ── needle tracks the song: outer groove at 0:00 → inner groove near the label at the end (continuous)
+  const sT = s.song;
+  let rN = rAt(sT);
+  if (sT < RETURN) rN = lerp(R_IN, rAt(sT), easeInOutSine(sT / RETURN));   // arm glides back out when the song loops
+  const tip = tipAt(rN);
+  // continuous line position (no wrap inside the song): p ∈ [-1, N-1]
+  const pLin = (s.idx === 0 && s.p > N - 1.5) ? s.p - N : s.p;
+
+  // lyric lines: line i lives on groove r_i = needle radius at the middle of its time slot
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
   for (let i = 0; i < N; i++) {
-    const d = rel(i, s.p);
-    if (d < -4.6 || d > 3.6) continue;
-    items.push({i, d, r: RC + d * GAP - 26 * clamp(-d)});
-  }
-  for (const it of items) {
-    const f = focus(it.d);
-    const size = lerp(19, 28, f);
-    const fade = clamp(1 - (Math.abs(it.d) - 2.4) / 1.4) ; // fade far lines
-    const r = it.r;
-    // the groove the line sits in
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = f > 0.01 ? `rgba(184,149,90,${0.35 * f})` : `rgba(255,255,255,${0.05 * fade})`;
-    ctx.beginPath(); ctx.arc(CX, CY, r - 8, A - .02, A + 1.25); ctx.stroke();
-    ctx.font = `${f > .5 ? 500 : 400} ${size}px ${FONT_JA}`;
-    const base = it.d > 0 ? C.sec : C.muted;
+    const d = i - pLin; if (d < -2.7 || d > 2.7) continue;
+    const f = focus(d), e = f * f * (3 - 2 * f);
+    const ri = grooveR(i);
+    // the groove itself (true radius), short arc running on from the arm
+    const ga = Math.atan2(tipAt(ri).y - CY, tipAt(ri).x - CX);
+    ctx.lineWidth = 1; ctx.strokeStyle = f > 0.01 ? `rgba(184,149,90,${0.4 * f})` : `rgba(255,255,255,${0.05 * clamp(1 - (Math.abs(d) - 1.5) / 1.5)})`;
+    ctx.beginPath(); ctx.arc(CX, CY, ri, ga - .02, ga + .55); ctx.stroke();
+    // text sits on the arm's sweep at its groove; neighbours ease apart a little to give the current line air
+    const push = d > 0 ? -50 * clamp(d) : 26 * clamp(-d);
+    const P = tipAt(ri + push);
+    const size = lerp(16, 27, e);
+    const fade = clamp(1 - (Math.abs(d) - 1.4) / 1.2);
+    ctx.font = `${f > .5 ? 500 : 400} ${size}px ${FONT_JA}`; ctx.letterSpacing = `${(e * 1.2).toFixed(2)}px`;
+    const base = d > 0 ? C.sec : C.muted;
     ctx.fillStyle = f > 0.01 ? mixColor(base, C.goldHi, f) : base;
-    ctx.globalAlpha = clamp(fade * (it.d < 0 ? .55 : .8) + f * .5);
-    // upright text: each line starts where its groove meets the needle and reads horizontally
-    const sx = CX + r * Math.cos(A + 0.035) + 6, sy = CY + r * Math.sin(A + 0.035) + 4;
-    ctx.textAlign = 'left'; ctx.letterSpacing = `${(f * 1.5).toFixed(2)}px`;
-    ctx.fillText(LYRICS[it.i].ja, sx, sy);
-    // translation: upright, just below the current line
-    if (f > 0.02) {
-      ctx.globalAlpha = f * f; ctx.letterSpacing = '1px';
-      ctx.font = `400 15px ${FONT_ZH}`; ctx.fillStyle = C.sec;
-      ctx.fillText(LYRICS[it.i].zh, sx + 2, sy + 28);
-    }
-    ctx.letterSpacing = '0px';
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = clamp(fade * (d < 0 ? .5 : .75) + f * .5);
+    const tx = P.x + 18, ty = P.y + size * .36;
+    ctx.fillText(LYRICS[i].ja, tx, ty);
+    if (f > 0.02) { ctx.globalAlpha = f * f; ctx.letterSpacing = '1px'; ctx.font = `400 14px ${FONT_ZH}`; ctx.fillStyle = C.sec; ctx.fillText(LYRICS[i].zh, tx + 2, ty + 24); }
+    ctx.globalAlpha = 1; ctx.letterSpacing = '0px';
   }
 
-  // tonearm (pivot top-left, tip at the current groove start)
+  // tonearm: fixed pivot, fixed length; its angle follows the needle radius
   const wob = Math.sin(t * 2.1) * 0.0025;
-  const tip = {x: CX + (RC + 13) * Math.cos(A - .008), y: CY + (RC + 13) * Math.sin(A - .008)};
-  const ang = Math.atan2(tip.y - PIV.y, tip.x - PIV.x) + wob, len = Math.hypot(tip.x - PIV.x, tip.y - PIV.y);
+  const ang = Math.atan2(tip.y - PIV.y, tip.x - PIV.x) + wob, len = ARM;
   ctx.save(); ctx.translate(PIV.x, PIV.y); ctx.rotate(ang);
   ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
   const ag = ctx.createLinearGradient(0, -3, 0, 3); ag.addColorStop(0, '#c9ced8'); ag.addColorStop(1, '#6b7385');

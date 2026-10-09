@@ -18,15 +18,16 @@
 <script src="../assets/common.js"></script>
 <script>
 /* Concept 7b — 光轮 II Luminous Train
-   One bold ring (40 outer teeth, 48 inner teeth) drives a plain visible chain inside the dial:
+   An engraved Roman-numeral band (6b style) whose 48 inner teeth drive a plain visible chain inside the dial:
    Ring(48 int) → L(28) → M(16) → S(10)   and   L(28) → S2(12).  No carrier, no bridges, no arms.
    Wheels are luminous hairlines (with a dark under-stroke so they read on bright art);
    the cover is veiled and turns crisp inside the wheels' spoke windows. Ring rotation = lyric arc. */
 const TAU = Math.PI * 2, CX = 200, CY = 400;
 const MI = 10, ZRI = 48, RRI = MI * ZRI / 2;          // ring internal: pitch R 240
-const MO = 16.25, ZRO = 40, RRO = MO * ZRO / 2;       // ring external crown: pitch R 325, tips 341 → Ø 682
-const R_COV = RRO - 1.25 * MO, R_TXT = 392;
-const STEP = 15 * Math.PI / 180;   // 1 line = 15°: 12 lines = 180° = 24 inner / 20 outer teeth → seamless loop
+const BAND_I = RRI + 1.2 * MI, BAND_O = 326;          // engraved band (6b style) between the inner-teeth root and Ø 652
+const R_COV = BAND_O, R_TXT = 392;
+const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+const STEP = 15 * Math.PI / 180;   // 1 line = 15°: 12 lines = 180° = 24 inner teeth → seamless loop
 const SS = 2, INK = '226,234,250';
 const smooth = x => x * x * x * (x * (x * 6 - 15) + 10);
 const easeInOutSine = x => -(Math.cos(Math.PI * x) - 1) / 2;
@@ -94,16 +95,15 @@ function bake(cover) {
     g.filter = 'blur(1.6px) saturate(.8) brightness(.67)'; if (cover) g.drawImage(cover, -4, -4, S + 8, S + 8); g.filter = 'none';
     g.globalCompositeOperation = 'multiply'; g.fillStyle = 'rgb(182,195,228)'; g.fillRect(0, 0, S, S); g.globalCompositeOperation = 'source-over';
     // ring band under heavier frost so the rim reads as one bold part
-    g.fillStyle = 'rgba(14,19,31,.3)'; g.beginPath(); g.arc(R_COV, R_COV, R_COV, 0, TAU); g.arc(R_COV, R_COV, RRI + 1.2 * MI, 0, TAU, true); g.fill();
+    g.fillStyle = 'rgba(16,21,34,.66)'; g.beginPath(); g.arc(R_COV, R_COV, R_COV, 0, TAU); g.arc(R_COV, R_COV, RRI + 1.2 * MI, 0, TAU, true); g.fill();
     B.veil = c; }
   { const [c, g] = mk(); g.filter = 'saturate(1.03) contrast(1.03)'; if (cover) g.drawImage(cover, 0, 0, S, S); B.crisp = c; }
   for (const k of ['L', 'M', 'S', 'S2']) { G[k].def = wheelDef(G[k]); B[k] = bakeWheel(G[k].def); }
-  { const outer = toPath(teeth(ZRO, RRO, MO, false)), inner = toPath(teeth(ZRI, RRI, MI, true)), body = new Path2D();
-    body.addPath(outer); body.addPath(inner);
-    const scale = new Path2D(); const rS = (RRI + 1.2 * MI + RRO - 1.2 * MO) / 2;
-    for (let k = 0; k < 24; k++) { const a = k * STEP, l = k % 2 ? 4 : 8; scale.moveTo(Math.cos(a) * (rS - l), Math.sin(a) * (rS - l)); scale.lineTo(Math.cos(a) * (rS + l), Math.sin(a) * (rS + l)); }
-    B.ring = bakeWheel({size: 2 * (RRO + MO) + 16, body, frost: .05, wins: [],
-      lines: [[outer, .8], [inner, .6], [scale, .3], [circ(RRO - 1.2 * MO - 6), .16], [circ(RRI + 1.2 * MI + 6), .16]]}); }
+  { // ring = engraved band (thin concentric rings + one quiet tick per lyric step) with the drive teeth on its inner edge
+    const inner = toPath(teeth(ZRI, RRI, MI, true)), ticks = new Path2D();
+    for (let k = 0; k < 24; k++) { const a = k * STEP; ticks.moveTo(Math.cos(a) * BAND_O, Math.sin(a) * BAND_O); ticks.lineTo(Math.cos(a) * (BAND_O - 6), Math.sin(a) * (BAND_O - 6)); }
+    B.ring = bakeWheel({size: 2 * BAND_O + 16, wins: [],
+      lines: [[circ(BAND_O), .42], [inner, .5], [ticks, .3], [circ(BAND_O - 22), .12], [circ(BAND_I + 7), .1]]}); }
   const shadow = c => { const t = document.createElement('canvas'); t.width = t.height = c.width; const g = t.getContext('2d'); g.filter = `blur(${3 * SS}px) brightness(0)`; g.drawImage(c, 0, 0); t.size = c.size; return t; };
   for (const k of ['ring', 'L', 'M', 'S', 'S2']) B[k + 'Sh'] = shadow(B[k]);
   B.mask = document.createElement('canvas');
@@ -125,6 +125,7 @@ boot(({ctx, cover}, t, s) => {
   const th = {}; th.L = meshInt(thR, G.L); th.M = meshExt(G.L, G.M, th.L); th.S = meshExt(G.M, G.S, th.M); th.S2 = meshExt(G.L, G.S2, th.L);
   const px = Math.sin(t * .13) * 2, py = Math.cos(t * .11) * 1.5;
   const beat = Math.exp(-mod(t, .5) / .12) * (mod(Math.floor(t / .5), 4) === 0 ? 1 : .55);
+  const soft = .5 - .5 * Math.cos(TAU * mod(t, 2) / 2);   // one slow swell per bar
   const dep = {ring: .4, L: 1, M: 1.25, S: 1.5, S2: 1.5};   // parallax depth: smaller wheels sit nearer the glass
 
   for (const [bx, by, br] of BOKEH) { const g = ctx.createRadialGradient(bx - px * 2, by - py * 2, 0, bx - px * 2, by - py * 2, br); g.addColorStop(0, 'rgba(170,190,230,.05)'); g.addColorStop(1, 'rgba(170,190,230,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx - px * 2, by - py * 2, br, 0, TAU); ctx.fill(); }
@@ -137,7 +138,7 @@ boot(({ctx, cover}, t, s) => {
     g.fillStyle = '#fff'; g.shadowColor = '#fff'; g.shadowBlur = 6 * dpr;
     for (const k of ['L', 'M', 'S', 'S2']) { const w = G[k]; g.save(); g.translate(w.x - CX + R_COV + px * dep[k], w.y - CY + R_COV + py * dep[k]); g.rotate(th[k]); for (const p of w.def.wins) g.fill(p); g.restore(); }
     g.shadowBlur = 0; g.globalCompositeOperation = 'source-in'; g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(B.crisp, 0, 0, mc.width, mc.height); g.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = .93 + .07 * beat; ctx.drawImage(mc, CX - R_COV, CY - R_COV, S, S); ctx.globalAlpha = 1; }
+    ctx.globalAlpha = .95 + .05 * soft; ctx.drawImage(mc, CX - R_COV, CY - R_COV, S, S); ctx.globalAlpha = 1; }
   { ctx.save(); ctx.beginPath(); ctx.arc(CX, CY, R_COV, 0, TAU); ctx.clip(); ctx.globalCompositeOperation = 'screen';
     const u = mod(t / 11, 1), x0 = CX - 560 + u * 1120, sw = ctx.createLinearGradient(x0 - 150, CY - 320, x0 + 150, CY + 320);
     sw.addColorStop(0, 'rgba(200,214,240,0)'); sw.addColorStop(.5, 'rgba(200,214,240,.06)'); sw.addColorStop(1, 'rgba(200,214,240,0)');
@@ -148,32 +149,33 @@ boot(({ctx, cover}, t, s) => {
   put(ctx, B.ringSh, CX + O[0] * .5, CY + O[1] * .5, thR, .45);
   for (const k of ['L', 'M', 'S', 'S2']) put(ctx, B[k + 'Sh'], G[k].x + O[0] * dep[k], G[k].y + O[1] * dep[k], th[k], .45);
   put(ctx, B.ring, CX + px * dep.ring, CY + py * dep.ring, thR);
+  // Roman numerals engraved on the band, riding with the ring (24 slots = two turns of I–XII), current one gold
+  ctx.font = `300 10px ${FONT_UI}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let i = 0; i < N; i++) for (const w of [0, 1]) {
+    const d0 = rel(i, s.p), d = w ? d0 + (d0 < 0 ? 12 : -12) : d0, a = d * STEP, f = w ? 0 : focus(d0);
+    ctx.save(); ctx.translate(CX + px * dep.ring + Math.cos(a) * (BAND_O - 11), CY + py * dep.ring + Math.sin(a) * (BAND_O - 11)); ctx.rotate(a + Math.PI / 2);
+    ctx.fillStyle = f > .02 ? rgba(C.gold, .35 + .5 * f) : `rgba(${INK},.24)`; ctx.fillText(ROMAN[i], 0, 0); ctx.restore(); }
   for (const k of ['L', 'M', 'S', 'S2']) put(ctx, B[k], G[k].x + px * dep[k], G[k].y + py * dep[k], th[k]);
 
-  // beat light along pitch circles (additive)
+  // calm light along the pitch circles: a slow, faint glint that only swells a little on the beat
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
-  const comet = (x, y, r, a, len, al) => { for (let k = 0; k < 6; k++) { ctx.strokeStyle = `rgba(${INK},${al * (1 - k / 6)})`; ctx.lineWidth = 1.5 - k * .15; ctx.beginPath(); ctx.arc(x, y, r, a - (k + 1) * len / 6, a - k * len / 6); ctx.stroke(); } };
-  comet(CX, CY, RRI, -t * .3 + 1, .5, .2 + .4 * beat);
-  comet(G.L.x + px, G.L.y + py, G.L.R, t * .8, 1.0, .22 + .5 * beat);
-  comet(G.M.x + px * 1.25, G.M.y + py * 1.25, G.M.R, -t * 1.1 + 2, 1.1, .16 + .4 * beat);
-  // mesh points: where two wheels touch, a soft light breathes with the beat — the linkage reads at a glance
-  const meshPt = (a, b, sign) => { const d = Math.hypot(b.x - a.x, b.y - a.y), k = sign * a.R / d, x = a.x + (b.x - a.x) * k, y = a.y + (b.y - a.y) * k;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, 16); g.addColorStop(0, `rgba(${INK},${.22 + .4 * beat})`); g.addColorStop(1, `rgba(${INK},0)`); ctx.fillStyle = g; ctx.fillRect(x - 16, y - 16, 32, 32); };
-  meshPt({x: CX, y: CY, R: RRI}, G.L, 1); meshPt(G.L, G.M, 1); meshPt(G.M, G.S, 1); meshPt(G.L, G.S2, 1);
+  const comet = (x, y, r, a, len, al) => { for (let k = 0; k < 6; k++) { ctx.strokeStyle = `rgba(${INK},${al * (1 - k / 6)})`; ctx.lineWidth = 1.2 - k * .12; ctx.beginPath(); ctx.arc(x, y, r, a - (k + 1) * len / 6, a - k * len / 6); ctx.stroke(); } };
+  comet(G.L.x + px, G.L.y + py, G.L.R, t * .35, 1.2, .09 + .07 * soft);
+  comet(G.M.x + px * 1.25, G.M.y + py * 1.25, G.M.R, -t * .5 + 2, 1.2, .07 + .05 * soft);
   ctx.restore();
 
   // glass crescent highlight + rim
   { ctx.save(); ctx.beginPath(); ctx.arc(CX, CY, R_COV - 1, 0, TAU); ctx.clip();
     const hl = ctx.createLinearGradient(CX - 200, CY - 300, CX + 80, CY - 40); hl.addColorStop(0, 'rgba(225,235,255,.09)'); hl.addColorStop(1, 'rgba(225,235,255,0)');
     ctx.fillStyle = hl; ctx.beginPath(); ctx.arc(CX, CY, R_COV - 6, Math.PI * 1.1, Math.PI * 1.7); ctx.arc(CX + 50, CY + 44, R_COV - 6, Math.PI * 1.7, Math.PI * 1.1, true); ctx.fill(); ctx.restore(); }
-  // progress: gold hairline just outside the teeth
-  const RP = RRO + MO + 9;
+  // progress: gold hairline just outside the band
+  const RP = BAND_O + 14;
   ctx.lineWidth = .7; ctx.strokeStyle = `rgba(${INK},.07)`; ctx.beginPath(); ctx.arc(CX, CY, RP, 0, TAU); ctx.stroke();
   ctx.strokeStyle = rgba(C.gold, .7); ctx.beginPath(); ctx.arc(CX, CY, RP, -Math.PI / 2, -Math.PI / 2 + TAU * s.progress); ctx.stroke();
   // index + connector
-  { const ix = CX + RP, g = ctx.createRadialGradient(ix, CY, 0, ix, CY, 22);
-    g.addColorStop(0, rgba(C.goldHi, .3 + .25 * beat)); g.addColorStop(1, rgba(C.goldHi, 0));
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ix, CY, 22, 0, TAU); ctx.fill();
+  { const ix = CX + BAND_O, g = ctx.createRadialGradient(ix, CY, 0, ix, CY, 18);
+    g.addColorStop(0, rgba(C.goldHi, .28)); g.addColorStop(1, rgba(C.goldHi, 0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ix, CY, 18, 0, TAU); ctx.fill();
     ctx.fillStyle = C.goldHi; ctx.beginPath(); ctx.arc(ix, CY, 2.2, 0, TAU); ctx.fill();
     const lg = ctx.createLinearGradient(ix + 8, 0, CX + R_TXT - 16, 0); lg.addColorStop(0, rgba(C.gold, .8)); lg.addColorStop(1, rgba(C.gold, 0));
     ctx.strokeStyle = lg; ctx.lineWidth = .8; ctx.beginPath(); ctx.moveTo(ix + 8, CY); ctx.lineTo(CX + R_TXT - 16, CY); ctx.stroke(); }

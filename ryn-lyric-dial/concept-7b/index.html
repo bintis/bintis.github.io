@@ -21,7 +21,7 @@
    A true planetary set: the engraved Roman-numeral band (6b style) is the ring gear (48 inner teeth),
    three planets (12) mesh with it and with the central sun (24). Carrier = a dotted hairline only; no arms, no bridges.
    Wheels are luminous hairlines (with a dark under-stroke so they read on bright art);
-   the cover is fully clear; the wheels' solid parts are translucent frosted glass, their windows fully clear. Ring rotation = lyric arc. */
+   the cover is fully clear; the wheels are luminous outlines only (no fill). Ring rotation = lyric arc. */
 const TAU = Math.PI * 2, CX = 200, CY = 400;
 const MI = 10, ZRI = 48, RRI = MI * ZRI / 2;          // ring internal: pitch R 240
 const BAND_I = RRI + 1.2 * MI, BAND_O = 340;          // engraved band (6b style) between the inner-teeth root and Ø 680
@@ -92,9 +92,6 @@ function bake(cover) {
     // the engraved band (unchanged): darker so the rim reads as one part
     g.fillStyle = 'rgba(16,21,34,.66)'; g.beginPath(); g.arc(R_COV, R_COV, R_COV, 0, TAU); g.arc(R_COV, R_COV, RRI + 1.2 * MI, 0, TAU, true); g.fill();
     B.veil = c; }
-  { // frosted glass for the gears' solid parts: the cover, blurred, with a ~20% cool-dark tint and a faint sheen
-    const [c, g] = mk(); g.filter = 'blur(6px) saturate(.9) brightness(.9)'; if (cover) g.drawImage(cover, -10, -10, S + 20, S + 20); g.filter = 'none';
-    g.fillStyle = 'rgba(12,17,28,.2)'; g.fillRect(0, 0, S, S); g.fillStyle = `rgba(${INK},.05)`; g.fillRect(0, 0, S, S); B.frost = c; }
   SUN.def = wheelDef(SUN); B.sun = bakeWheel(SUN.def); PLANET.def = wheelDef(PLANET); B.planet = bakeWheel(PLANET.def);
   { // ring = engraved band (thin concentric rings + one quiet tick per lyric step) with the drive teeth on its inner edge
     const inner = toPath(teeth(ZRI, RRI, MI, true)), ticks = new Path2D();
@@ -131,16 +128,9 @@ boot(({ctx, cover}, t, s) => {
 
   for (const [bx, by, br] of BOKEH) { const g = ctx.createRadialGradient(bx - px * 2, by - py * 2, 0, bx - px * 2, by - py * 2, br); g.addColorStop(0, 'rgba(170,190,230,.05)'); g.addColorStop(1, 'rgba(170,190,230,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx - px * 2, by - py * 2, br, 0, TAU); ctx.fill(); }
 
-  // cover clear; gear bodies are frosted glass (windows stay fully clear)
+  // cover fully clear; gears are outlines only (no fill, no tint, no blur)
   ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 60; ctx.fillStyle = '#0d121c'; ctx.beginPath(); ctx.arc(CX, CY, R_COV, 0, TAU); ctx.fill(); ctx.restore();
   ctx.drawImage(B.veil, CX - R_COV, CY - R_COV, 2 * R_COV, 2 * R_COV);
-  { const S = 2 * R_COV, mc = B.mask; if (mc.width !== Math.round(S * dpr)) mc.width = mc.height = Math.round(S * dpr);
-    const g = mc.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, mc.width, mc.height); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.fillStyle = '#fff';
-    for (const w of W) { g.save(); g.translate(w.x - CX + R_COV + px * w.d, w.y - CY + R_COV + py * w.d); g.rotate(w.th); g.fill(w.def.body);
-      g.globalCompositeOperation = 'destination-out'; for (const p of w.def.wins) g.fill(p); g.globalCompositeOperation = 'source-over'; g.restore(); }
-    g.globalCompositeOperation = 'source-in'; g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(B.frost, 0, 0, mc.width, mc.height); g.globalCompositeOperation = 'source-over';
-    ctx.drawImage(mc, CX - R_COV, CY - R_COV, S, S); }
   { ctx.save(); ctx.beginPath(); ctx.arc(CX, CY, R_COV, 0, TAU); ctx.clip(); ctx.globalCompositeOperation = 'screen';
     const u = mod(t / 11, 1), x0 = CX - 560 + u * 1120, sw = ctx.createLinearGradient(x0 - 150, CY - 320, x0 + 150, CY + 320);
     sw.addColorStop(0, 'rgba(200,214,240,0)'); sw.addColorStop(.5, 'rgba(200,214,240,.06)'); sw.addColorStop(1, 'rgba(200,214,240,0)');
@@ -148,8 +138,7 @@ boot(({ctx, cover}, t, s) => {
 
   // shadows, then the wheels
   const O = [3, 5];
-  put(ctx, B.ringSh, CX + O[0] * .5, CY + O[1] * .5, thR, .14);
-  for (const w of W) put(ctx, B[w.tex + 'Sh'], w.x + O[0] * w.d, w.y + O[1] * w.d, w.th, .14);
+  put(ctx, B.ringSh, CX + O[0] * .5, CY + O[1] * .5, thR, .06);   // barely-there band shadow; sun/planets cast none
   put(ctx, B.ring, CX + px * dep.ring, CY + py * dep.ring, thR);
   // Roman numerals engraved on the band, riding with the ring (24 slots = two turns of I–XII), current one gold
   ctx.font = `300 10px ${FONT_UI}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';

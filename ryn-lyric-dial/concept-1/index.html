@@ -71,13 +71,17 @@ boot(({ctx, cover}, t, s) => {
     const base = it.d > 0 ? C.sec : C.muted;
     ctx.fillStyle = f > 0.01 ? mixColor(base, C.goldHi, f) : base;
     ctx.globalAlpha = clamp(fade * (it.d < 0 ? .55 : .8) + f * .5);
-    arcText(ctx, LYRICS[it.i].ja, CX, CY, r, A + 0.035, 'start', f * 1.5);
-    // translation: rides just inside the current groove
+    // upright text: each line starts where its groove meets the needle and reads horizontally
+    const sx = CX + r * Math.cos(A + 0.035) + 6, sy = CY + r * Math.sin(A + 0.035) + 4;
+    ctx.textAlign = 'left'; ctx.letterSpacing = `${(f * 1.5).toFixed(2)}px`;
+    ctx.fillText(LYRICS[it.i].ja, sx, sy);
+    // translation: upright, just below the current line
     if (f > 0.02) {
-      ctx.globalAlpha = f * f;
+      ctx.globalAlpha = f * f; ctx.letterSpacing = '1px';
       ctx.font = `400 15px ${FONT_ZH}`; ctx.fillStyle = C.sec;
-      arcText(ctx, LYRICS[it.i].zh, CX, CY, r - 30, A + 0.04, 'start', 1);
+      ctx.fillText(LYRICS[it.i].zh, sx + 2, sy + 28);
     }
+    ctx.letterSpacing = '0px';
     ctx.globalAlpha = 1;
   }
 

@@ -57,7 +57,7 @@ const circ = (r, p = new Path2D(), x = 0, y = 0) => { p.moveTo(x + r, y); p.arc(
 
 // ── the planetary set: Zr = Zs + 2·Zp (48 = 24 + 2·12), (Zs + Zr)/3 = 24 → three equally spaced planets mesh
 const ZS = 24, ZP = 12, NP = 3;
-const SUN = {Z: ZS, R: MI * ZS / 2, n: 5, hub: 24}, PLANET = {Z: ZP, R: MI * ZP / 2, n: 3, hub: 11};
+const SUN = {Z: ZS, R: MI * ZS / 2, n: 3, hub: 20}, PLANET = {Z: ZP, R: MI * ZP / 2, n: 3, hub: 11};
 const RC = SUN.R + PLANET.R;                                   // carrier radius 180 (= RRI − Rp)
 function meshExt(a, b, thA) { const psi = Math.atan2(b.y - a.y, b.x - a.x); return psi + Math.PI - Math.PI / b.Z + (a.Z / b.Z) * (psi - thA); }
 
@@ -67,18 +67,18 @@ function bakeWheel(def) {
   const g = c.getContext('2d'); g.scale(SS, SS); g.translate(S / 2, S / 2); g.lineJoin = 'round';
   if (def.frost) { g.fillStyle = `rgba(${INK},${def.frost})`; g.fill(def.body, 'evenodd'); g.globalCompositeOperation = 'destination-out'; g.fillStyle = '#000'; for (const w of def.wins) g.fill(w); g.globalCompositeOperation = 'source-over'; }
   const items = def.lines;   // [path, weight 0..1, dashed]
-  g.strokeStyle = 'rgba(6,9,16,.55)'; for (const [p, k, dash] of items) { if (dash) continue; g.lineWidth = 2.6 + k; g.stroke(p); }
-  for (const [p, k, dash] of items) { if (dash) continue; g.strokeStyle = `rgba(${INK},${.07 * k})`; g.lineWidth = 4; g.stroke(p); }
-  for (const [p, k, dash] of items) { g.setLineDash(dash ? [2, 5] : []); g.strokeStyle = `rgba(${INK},${k})`; g.lineWidth = dash ? .8 : .7 + .5 * k; g.stroke(p); }
+  for (const [p, k, dash] of items) { if (dash) continue; g.strokeStyle = `rgba(${INK},${.06 * k})`; g.lineWidth = 5; g.stroke(p); }   // faint glow
+  g.strokeStyle = 'rgba(6,9,16,.62)'; for (const [p, k, dash] of items) { if (dash) continue; g.lineWidth = 2.8 + k; g.stroke(p); }  // dark under-stroke
+  for (const [p, k, dash] of items) { g.setLineDash(dash ? [2, 5] : []); g.strokeStyle = `rgba(${INK},${k})`; g.lineWidth = dash ? .8 : .8 + .5 * k; g.stroke(p); }
   g.setLineDash([]); return c;
 }
 function wheelDef(w) {
   const m = MI, rRoot = w.R - 1.2 * m, rim = Math.max(7, w.R * .1), out = toPath(teeth(w.Z, w.R, m, false));
-  const sw = w.R * .07, wins = [];
-  for (let k = 0; k < w.n; k++) wins.push(toPath(windowShape(k * TAU / w.n, (k + 1) * TAU / w.n, w.hub + 5, rRoot - rim, sw * .9, sw * .6)));
-  const body = new Path2D(); body.addPath(out);
-  return {size: 2 * (w.R + m) + 16, wins, body, frost: 0,
-    lines: [[out, .85], ...wins.map(p => [p, .4]), [circ(w.hub), .5], [circ(w.hub * .42), .35], [circ(w.R), .2, true]]};
+  // simple interior: inner rim circle, plain hub, w.n straight thin spokes
+  const spokes = new Path2D();
+  for (let k = 0; k < w.n; k++) { const a = k * TAU / w.n + Math.PI / 2; spokes.moveTo(Math.cos(a) * w.hub, Math.sin(a) * w.hub); spokes.lineTo(Math.cos(a) * (rRoot - rim), Math.sin(a) * (rRoot - rim)); }
+  return {size: 2 * (w.R + m) + 16, wins: [], body: out, frost: 0,
+    lines: [[out, .95], [circ(rRoot - rim), .62], [spokes, .7], [circ(w.hub), .72]]};
 }
 const B = {};
 function bake(cover) {
@@ -117,7 +117,9 @@ boot(({ctx, cover}, t, s) => {
   // kinematics
   const thR = -s.p * STEP;
   // planetary kinematics: ring = lyric arc, carrier drifts slowly, sun by Willis (+ phase so all teeth mesh)
-  const thC = t * .02, thS = thC * (1 + ZRI / ZS) - (ZRI / ZS) * thR + Math.PI * ZP / ZS;
+  // the ring drives, the sun is nearly held (a very slow creep): the carrier — and the planets with it —
+  // visibly orbit the sun, 10° per lyric line (θC = (Zs·θS + Zr·θR)/(Zs + Zr)), gliding with the line easing
+  const thS = Math.PI * ZP / ZS - t * .03, thC = (ZS * (thS - Math.PI * ZP / ZS) + ZRI * thR) / (ZS + ZRI);
   const W = [{tex: 'sun', def: SUN.def, x: CX, y: CY, th: thS, d: 1}];
   for (let i = 0; i < NP; i++) { const psi = thC + i * TAU / NP, w = {Z: ZP, x: CX + Math.cos(psi) * RC, y: CY + Math.sin(psi) * RC};
     W.push({tex: 'planet', def: PLANET.def, x: w.x, y: w.y, th: meshExt({x: CX, y: CY, Z: ZS}, w, thS), d: 1.3}); }
